@@ -1,8 +1,8 @@
 # Common Bean UAV Nitrogen Gradient
 
-This repository contains the analysis-ready dataset associated with a multitemporal UAV study of common bean (*Phaseolus vulgaris* L.) grown under a nitrogen fertilization gradient.
+This repository contains the analysis-ready dataset and R scripts associated with a multitemporal UAV study of common bean (*Phaseolus vulgaris* L.) grown under a nitrogen fertilization gradient.
 
-It provides a transparent and compact description of the final dataset used for statistical analysis and figure generation.
+It provides a transparent workflow linking final spatial products, canopy statistics, field harvest data, and the canonical dataset used for statistical analysis and figure generation.
 
 ## Associated manuscript
 
@@ -29,8 +29,6 @@ Because each nitrogen rate was represented by a single subplot, the nitrogen tre
 
 ## UAV acquisitions
 
-UAV observations were acquired at five crop growth stages:
-
 | Flight | Date | Growth stage |
 |---|---|---|
 | 1 | 2024-09-07 | V4 |
@@ -48,27 +46,63 @@ common-bean-uav-nitrogen-gradient/
 │
 ├── README.md
 ├── data/
-│   └── common_bean_uav_master_dataset.csv
+│   ├── common_bean_uav_master_dataset.csv
+│   └── field/
+│       └── harvest_data.csv
+├── derived/
+│   ├── canopy_summary_by_subplot.csv
+│   ├── qa_canopy_geopackages.csv
+│   └── qa_spatial_extraction.csv
+├── scripts/
+│   ├── 00_build_canopy_geopackages.R
+│   ├── 01_extract_canopy_statistics.R
+│   └── 02_build_master_dataset.R
 └── docs/
     └── data_dictionary.md
 ```
 
 ## Data access
 
-- [Download the analysis-ready master dataset](data/common_bean_uav_master_dataset.csv)
-- [View the data dictionary](docs/data_dictionary.md)
+- [Analysis-ready master dataset](data/common_bean_uav_master_dataset.csv)
+- [Final harvest data](data/field/harvest_data.csv)
+- [Validated canopy summary](derived/canopy_summary_by_subplot.csv)
+- [Spatial extraction QA](derived/qa_spatial_extraction.csv)
+- [GeoPackage QA](derived/qa_canopy_geopackages.csv)
+- [Data dictionary](docs/data_dictionary.md)
+
+## Spatial inputs
+
+The extraction script expects the final spatial products under `data/spatial/flight01` through `flight05`, with three GeoTIFF index rasters and one canopy GeoPackage per flight.
+
+Because these spatial files are substantially larger than the tabular data and code, they are not currently tracked in this GitHub repository. A permanent external archive link will be added before manuscript submission.
+
+## Reproducible workflow
+
+```text
+Final NDVI / MSAVI / WDRVI rasters
+                +
+        Canopy GeoPackages
+                ↓
+01_extract_canopy_statistics.R
+                ↓
+derived/canopy_summary_by_subplot.csv
+                +
+     data/field/harvest_data.csv
+                ↓
+02_build_master_dataset.R
+                ↓
+data/common_bean_uav_master_dataset.csv
+```
+
+`00_build_canopy_geopackages.R` is an optional preparation utility used to consolidate the five subplot canopy shapefiles for each flight into a single GeoPackage.
+
+The spatial workflow was validated by checking feature counts, canopy-area preservation, raster coverage, and numerical agreement between the regenerated canopy summary and the canonical master dataset.
+
+## Statistical structure
 
 Each row of the master dataset represents one **subplot × UAV flight** observation.
 
-The dataset therefore contains:
-
-- 5 subplots;
-- 5 UAV flights;
-- 25 subplot × flight records.
-
-The spectral and canopy variables are repeated measurements through time.
-
-## Statistical structure
+The dataset contains 5 subplots, 5 UAV flights, and 25 subplot × flight records. Spectral and canopy variables are repeated measurements through time.
 
 Grain yield was measured once at final harvest for each subplot. The same final-harvest value is repeated across the five UAV-flight rows belonging to that subplot only to maintain a rectangular longitudinal dataset.
 
@@ -78,11 +112,9 @@ Consequently:
 - there are only **5 independent final-harvest observations**;
 - repeated yield values must **not** be treated as 25 independent yield measurements.
 
-This distinction should be preserved in any statistical analysis using the dataset.
-
 ## Grain-yield calculation
 
-Grain yield is expressed relative to the harvested ground area:
+Grain yield is expressed relative to harvested ground area:
 
 `Y = (M_g / A_h) × 10`
 
@@ -96,28 +128,23 @@ The harvested ground area was **40 m² for each subplot**.
 
 Projected canopy area (`canopy_area_m2`) is a UAV-derived structural variable and is **not** used as the denominator for agronomic grain-yield calculation.
 
-## Canopy-area and canopy-object variables
+## Canopy variables
 
-`canopy_area_m2` represents the total projected canopy area segmented within each subplot at each UAV acquisition date.
+`canopy_area_m2` is the total projected canopy area segmented within each subplot at each UAV acquisition date.
 
-`canopy_polygon_count` represents the number of segmented canopy objects within the subplot. It should **not** be interpreted as plant count, because neighboring plant canopies progressively merged into larger connected objects during crop development.
+`canopy_polygon_count` is the number of segmented canopy objects within the subplot. It should **not** be interpreted as plant count because neighboring plant canopies progressively merged during crop development.
 
 ## Variables
 
-The master dataset contains the following fields:
+The canonical dataset contains:
 
 `flight`, `date`, `growth_stage`, `subplot`, `N_rate_kg_ha`, `canopy_area_m2`, `canopy_polygon_count`, `NDVI_mean`, `MSAVI_mean`, `WDRVI_mean`, `harvest_area_m2`, `harvested_grain_kg`, and `grain_yield_t_ha`.
 
-A complete description of the variables, units, and interpretation is provided in the [data dictionary](docs/data_dictionary.md).
+A complete description is provided in the [data dictionary](docs/data_dictionary.md).
 
 ## Recommended use
 
-The dataset is appropriate for:
-
-- descriptive multitemporal analysis;
-- visualization of canopy development;
-- within-date comparison across the nitrogen gradient;
-- exploratory associations between UAV-derived variables and final grain yield.
+The dataset is appropriate for descriptive multitemporal analysis, visualization of canopy development, within-date comparison across the nitrogen gradient, and exploratory associations between UAV-derived variables and final grain yield.
 
 Because the nitrogen rates were not independently replicated, treatment-response relationships should not be interpreted as confirmatory causal effects or generalized fertilizer recommendations.
 
