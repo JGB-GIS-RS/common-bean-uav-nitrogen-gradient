@@ -2,7 +2,7 @@
 
 This repository contains the analysis-ready dataset and R scripts associated with a multitemporal UAV study of common bean (*Phaseolus vulgaris* L.) grown under a nitrogen fertilization gradient.
 
-It provides a transparent workflow linking final spatial products, canopy statistics, field harvest data, and the canonical dataset used for statistical analysis and figure generation.
+It provides a transparent workflow linking final spatial products, canopy statistics, field harvest data, the canonical analysis dataset, descriptive statistics, stage-specific UAV–yield associations, and manuscript figures.
 
 ## Associated manuscript
 
@@ -29,13 +29,15 @@ Because each nitrogen rate was represented by a single subplot, the nitrogen tre
 
 ## UAV acquisitions
 
-| Flight | Date | Growth stage |
-|---|---|---|
-| 1 | 2024-09-07 | V4 |
-| 2 | 2024-09-14 | R5 |
-| 3 | 2024-10-02 | R6 |
-| 4 | 2024-10-09 | R7 |
-| 5 | 2024-10-16 | R8 |
+Nitrogen was applied on **30 August 2024**. All UAV acquisitions therefore occurred after fertilization.
+
+| Flight | Date | Growth stage | Days after N application |
+|---|---|---|---:|
+| 1 | 2024-09-07 | V4 | 8 |
+| 2 | 2024-09-14 | R5 | 15 |
+| 3 | 2024-10-02 | R6 | 33 |
+| 4 | 2024-10-09 | R7 | 40 |
+| 5 | 2024-10-16 | R8 | 47 |
 
 The UAV platform was a DJI Phantom 3 Professional equipped with a MAPIR Survey2 Red/NIR camera. Final analysis variables include projected canopy area and mean canopy values of NDVI, MSAVI, and WDRVI.
 
@@ -47,19 +49,40 @@ common-bean-uav-nitrogen-gradient/
 ├── README.md
 ├── data/
 │   ├── common_bean_uav_master_dataset.csv
-│   └── field/
-│       └── harvest_data.csv
+│   ├── field/
+│   │   └── harvest_data.csv
+│   └── spatial/
+│       ├── flight01/
+│       ├── flight02/
+│       ├── flight03/
+│       ├── flight04/
+│       └── flight05/
+│
 ├── derived/
 │   ├── canopy_summary_by_subplot.csv
 │   ├── qa_canopy_geopackages.csv
-│   └── qa_spatial_extraction.csv
+│   ├── qa_spatial_extraction.csv
+│   ├── descriptive_summary_by_flight.csv
+│   ├── exploratory_yield_associations_by_flight.csv
+│   └── final_harvest_by_subplot.csv
+│
 ├── scripts/
 │   ├── 00_build_canopy_geopackages.R
 │   ├── 01_extract_canopy_statistics.R
-│   └── 02_build_master_dataset.R
+│   ├── 02_build_master_dataset.R
+│   ├── 03_descriptive_analysis.R
+│   ├── 04_yield_association_figure.R
+│   ├── 05_multitemporal_uav_figure.R
+│   └── 06_spatial_spectral_figure_R6.R
+│
+├── figures/
+│   └── [generated manuscript figures]
+│
 └── docs/
     └── data_dictionary.md
 ```
+
+The `data/spatial/` directories describe the expected local project structure. The large spatial files are not currently tracked in GitHub; see **Spatial inputs** below.
 
 ## Data access
 
@@ -72,31 +95,81 @@ common-bean-uav-nitrogen-gradient/
 
 ## Spatial inputs
 
-The extraction script expects the final spatial products under `data/spatial/flight01` through `flight05`, with three GeoTIFF index rasters and one canopy GeoPackage per flight.
+The spatial-processing scripts expect the final products under `data/spatial/flight01` through `flight05`.
 
-Because these spatial files are substantially larger than the tabular data and code, they are not currently tracked in this GitHub repository. A permanent external archive link will be added before manuscript submission.
+For each flight, the workflow uses:
+
+- canopy polygons, either as the original subplot shapefiles or as the consolidated canopy GeoPackage;
+- NDVI GeoTIFF;
+- MSAVI GeoTIFF;
+- WDRVI GeoTIFF.
+
+Because these spatial files are substantially larger than the tabular data and code, they are not currently tracked in this GitHub repository. A permanent external archive link can be added before final publication if the spatial products are deposited separately.
 
 ## Reproducible workflow
 
+The scripts are numbered according to the recommended execution order.
+
 ```text
-Final NDVI / MSAVI / WDRVI rasters
+Original canopy shapefiles by subplot
+                ↓
+00_build_canopy_geopackages.R
+                ↓
+Consolidated canopy GeoPackage for each flight
                 +
-        Canopy GeoPackages
+Final NDVI / MSAVI / WDRVI rasters
                 ↓
 01_extract_canopy_statistics.R
                 ↓
 derived/canopy_summary_by_subplot.csv
                 +
-     data/field/harvest_data.csv
+data/field/harvest_data.csv
                 ↓
 02_build_master_dataset.R
                 ↓
 data/common_bean_uav_master_dataset.csv
+                ↓
+03_descriptive_analysis.R
+                ↓
+Descriptive summaries + stage-specific exploratory UAV–yield associations
+                ↓
+       ┌───────────────┬─────────────────────┐
+       ↓               ↓                     ↓
+04_yield_       05_multitemporal_    06_spatial_spectral_
+association_    uav_figure.R         figure_R6.R
+figure.R
+       ↓               ↓                     ↓
+Stage-specific   Multitemporal       Spatial/spectral
+association      canopy and index    R6 figure
+figure           figure
 ```
 
-`00_build_canopy_geopackages.R` is an optional preparation utility used to consolidate the five subplot canopy shapefiles for each flight into a single GeoPackage.
+### Script descriptions
 
-The spatial workflow was validated by checking feature counts, canopy-area preservation, raster coverage, and numerical agreement between the regenerated canopy summary and the canonical master dataset.
+| Script | Purpose | Main input(s) | Main output(s) |
+|---|---|---|---|
+| `00_build_canopy_geopackages.R` | Optional preparation step that consolidates P1–P5 canopy shapefiles into one GeoPackage per UAV flight and checks feature counts and area preservation. | Subplot canopy shapefiles | `canopy_YYYYMMDD.gpkg`; `derived/qa_canopy_geopackages.csv` |
+| `01_extract_canopy_statistics.R` | Extracts subplot-level projected canopy area and spectral-index statistics from final NDVI, MSAVI and WDRVI rasters within the segmented canopy. Duplicate raster cells are removed before summary statistics are calculated. | Canopy GeoPackages; NDVI/MSAVI/WDRVI rasters | `derived/canopy_summary_by_subplot.csv`; extraction QA files |
+| `02_build_master_dataset.R` | Joins canopy summaries with harvest data and constructs the canonical 25-row longitudinal dataset. | Canopy summary; harvest data | `data/common_bean_uav_master_dataset.csv` |
+| `03_descriptive_analysis.R` | Produces descriptive summaries and stage-specific exploratory Pearson correlations between UAV-derived metrics and final grain yield. | Canonical master dataset | Descriptive and UAV–yield association tables in `derived/` |
+| `04_yield_association_figure.R` | Generates the stage-specific UAV–yield association figure from the exploratory Pearson coefficients. | Master/derived association data | Manuscript-ready association figure |
+| `05_multitemporal_uav_figure.R` | Generates the four-panel multitemporal figure for projected canopy area, NDVI, MSAVI and WDRVI across V4–R8. | Canonical master dataset | Manuscript-ready multitemporal figure |
+| `06_spatial_spectral_figure_R6.R` | Generates the R6 spatial/spectral figure using the segmented canopy and spectral-index rasters. Display percentiles are used only for visualization and do not modify the original raster values. | R6 canopy and spectral rasters | Manuscript-ready R6 spatial/spectral figure |
+
+`00_build_canopy_geopackages.R` is optional when the consolidated GeoPackages are already available. Scripts `01`–`03` form the principal data-to-analysis chain. Scripts `04`–`06` reproduce analytical and cartographic figures used in the manuscript workflow.
+
+## Software requirements
+
+The workflow is implemented in R. Depending on the script, the following packages are required:
+
+- `terra`
+- `ggplot2`
+- `sf`
+- `dplyr`
+- `cowplot`
+- `scales`
+
+Base R is used for tabular data handling and the stage-specific descriptive/correlation calculations where possible. Each script checks or loads the packages needed for its own task.
 
 ## Statistical structure
 
@@ -110,7 +183,10 @@ Consequently:
 
 - there are **25 spectral/structural observations**;
 - there are only **5 independent final-harvest observations**;
-- repeated yield values must **not** be treated as 25 independent yield measurements.
+- repeated yield values must **not** be treated as 25 independent yield measurements;
+- nitrogen rates must **not** be treated as independently replicated treatments.
+
+For this reason, `03_descriptive_analysis.R` intentionally emphasizes descriptive summaries and stage-specific exploratory associations. It does not use the 25 repeated rows as independent yield observations and is not intended to estimate a causal fertilizer dose–response relationship or an optimal N rate.
 
 ## Grain-yield calculation
 
@@ -134,6 +210,8 @@ Projected canopy area (`canopy_area_m2`) is a UAV-derived structural variable an
 
 `canopy_polygon_count` is the number of segmented canopy objects within the subplot. It should **not** be interpreted as plant count because neighboring plant canopies progressively merged during crop development.
 
+Mean NDVI, MSAVI and WDRVI values are calculated from valid raster pixels located within the segmented canopy regions for each subplot and acquisition date.
+
 ## Variables
 
 The canonical dataset contains:
@@ -144,12 +222,18 @@ A complete description is provided in the [data dictionary](docs/data_dictionary
 
 ## Recommended use
 
-The dataset is appropriate for descriptive multitemporal analysis, visualization of canopy development, within-date comparison across the nitrogen gradient, and exploratory associations between UAV-derived variables and final grain yield.
+The dataset and scripts are appropriate for:
 
-Because the nitrogen rates were not independently replicated, treatment-response relationships should not be interpreted as confirmatory causal effects or generalized fertilizer recommendations.
+- descriptive multitemporal analysis of canopy development;
+- visualization of structural and spectral trajectories from V4 to R8;
+- within-date descriptive comparison across the field nitrogen gradient;
+- exploratory stage-specific associations between UAV-derived variables and final grain yield;
+- reproduction of the manuscript's analytical figures.
+
+Because the nitrogen rates were not independently replicated, treatment-response relationships should not be interpreted as confirmatory causal effects, statistically validated fertilizer optima, or generalized fertilizer recommendations.
 
 ## Citation
 
-If you use these data, please cite the associated manuscript when available.
+If you use these data or scripts, please cite the associated manuscript when available.
 
 Repository citation details will be updated after publication or DOI registration.
