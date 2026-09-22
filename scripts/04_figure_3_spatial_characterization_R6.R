@@ -997,7 +997,8 @@ center_p4 <- get_subplot_center(
 )
 
 center_p1 <- get_subplot_center(
-  canopy_sf,  "P1"
+  canopy_sf,
+  "P1"
 )
 
 zoom_size_map <- 2.20
@@ -1996,7 +1997,8 @@ build_additional_spectral_panel <- function(
     mean_legend_plot_idx
   )
 
-  pixel_legend_idx <- cowplot::get_legend(    pixel_legend_plot_idx
+  pixel_legend_idx <- cowplot::get_legend(
+    pixel_legend_plot_idx
   )
 
   list(
