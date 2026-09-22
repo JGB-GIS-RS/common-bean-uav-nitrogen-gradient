@@ -243,13 +243,13 @@ Because the nitrogen rates were not independently replicated, treatment-response
 
 ## Reproducible R environment
 
-The exact package environment should be captured with `renv` from the local
-R installation used to run the manuscript workflow. The repository includes
+The computational environment was captured with `renv` from the local R
+installation used for the manuscript workflow (R 4.4.1 on Windows 11). The repository includes
 instructions in [docs/reproducibility.md](docs/reproducibility.md).
 
-After environment capture, the repository should contain `renv.lock` and
-`sessionInfo.txt`. A third party can then restore the recorded package
-versions with:
+The repository includes `renv.lock` and `sessionInfo.txt`, captured from
+the local R environment used for the manuscript workflow. A third party can
+restore the recorded package versions with:
 
 ```r
 install.packages("renv")
