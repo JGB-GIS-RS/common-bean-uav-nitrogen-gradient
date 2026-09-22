@@ -997,4 +997,1251 @@ center_p4 <- get_subplot_center(
 )
 
 center_p1 <- get_subplot_center(
+  canopy_sf,  "P1"
+)
+
+zoom_size_map <- 2.20
+
+left_zoom_box <- make_square_bbox(
+  center_x = as.numeric(center_p4["x"]) + 0.35,
+  center_y = as.numeric(center_p4["y"]) + 0.20,
+  size = zoom_size_map,
+  crs_obj = st_crs(canopy_sf)
+)
+
+right_zoom_box <- make_square_bbox(
+  center_x = as.numeric(center_p1["x"]) - 0.55,
+  center_y = as.numeric(center_p1["y"]) - 0.35,
+  size = zoom_size_map,
+  crs_obj = st_crs(canopy_sf)
+)
+
+# pixel limits based only on both canopy-only zooms
+get_zoom_values <- function(
+  box_sfc,
   canopy_sf,
+  raster_obj
+) {
+
+  box_sf <- st_as_sf(
+    box_sfc
+  )
+
+  canopy_box <- suppressWarnings(
+    st_intersection(
+      canopy_sf,
+      box_sf
+    )
+  )
+
+  bb_box <- st_bbox(
+    box_sfc
+  )
+
+  r_crop <- crop(
+    raster_obj,
+    ext(
+      as.numeric(bb_box["xmin"]),
+      as.numeric(bb_box["xmax"]),
+      as.numeric(bb_box["ymin"]),
+      as.numeric(bb_box["ymax"])
+    )
+  )
+
+  r_mask <- mask(
+    r_crop,
+    vect(canopy_box)
+  )
+
+  values(
+    r_mask,
+    na.rm = TRUE
+  )
+}
+
+pixel_values <- c(
+  get_zoom_values(
+    left_zoom_box,
+    canopy_sf,
+    ndvi_r
+  ),
+  get_zoom_values(
+    right_zoom_box,
+    canopy_sf,
+    ndvi_r
+  )
+)
+
+pixel_limits <- as.numeric(
+  quantile(
+    pixel_values,
+    probs = c(0.02, 0.98),
+    na.rm = TRUE
+  )
+)
+
+if (!all(is.finite(pixel_limits)) || diff(pixel_limits) <= 0) {
+  pixel_limits <- range(
+    pixel_values,
+    na.rm = TRUE
+  )
+}
+
+# Pixel scales always use 4 equally spaced ticks.
+pixel_breaks <- seq(
+  pixel_limits[1],
+  pixel_limits[2],
+  length.out = 4
+)
+
+pB_zoom_left <- build_zoom_plot(
+  box_sfc = left_zoom_box,
+  canopy_sf = canopy_sf,
+  raster_obj = ndvi_r,
+  pixel_limits = pixel_limits,
+  pixel_palette = ndvi_palette
+)
+
+pB_zoom_right <- build_zoom_plot(
+  box_sfc = right_zoom_box,
+  canopy_sf = canopy_sf,
+  raster_obj = ndvi_r,
+  pixel_limits = pixel_limits,
+  pixel_palette = ndvi_palette
+)
+
+# ------------------------------------------------------------
+# FIX: INSETS ARE NOW ANCHORED IN UTM MAP COORDINATES
+# ------------------------------------------------------------
+# Using annotation_custom() in projected map coordinates avoids
+# the normalized ggdraw coordinates that caused the zoom windows
+# to drift onto axes and labels after panel composition.
+#
+# Both displayed insets are exactly the same size in metres.
+# Only these positions are adjusted; the scientific content,
+# zoom source windows, scales, CRS and legends remain unchanged.
+
+zoom_left_grob  <- ggplotGrob(pB_zoom_left)
+zoom_right_grob <- ggplotGrob(pB_zoom_right)
+
+inset_size_m <- 5.20
+
+# Upper-left white space: moved clearly right of the Y axis / north arrow
+inset_left <- c(
+  xmin = xlim_common[1] + 3.40,
+  xmax = xlim_common[1] + 3.40 + inset_size_m,
+  ymin = ylim_common[2] - 6.10,
+  ymax = ylim_common[2] - 6.10 + inset_size_m
+)
+
+# SECOND ZOOM: move ONLY this inset next to the approved upper inset.
+# The upper inset (inset_left) is left completely unchanged.
+# Both zoom windows keep exactly the same size and vertical alignment.
+zoom_gap_m <- 0.85
+
+# IMPORTANT FIX:
+# inset_left["xmax"] and inset_left["ymin"] are named scalars.
+# If they are inserted directly into c(xmin = ..., ...), R can create
+# compound names such as "xmin.xmax". Later, inset_right["xmin"] then
+# returns NA, which produces the non-finite viewport error in grid/cowplot.
+# as.numeric() removes those inherited names and keeps clean xmin/xmax/ymin/ymax.
+inset_right <- c(
+  xmin = as.numeric(inset_left["xmax"]) + zoom_gap_m,
+  xmax = as.numeric(inset_left["xmax"]) + zoom_gap_m + inset_size_m,
+  ymin = as.numeric(inset_left["ymin"]),
+  ymax = as.numeric(inset_left["ymax"])
+)
+
+# Defensive check: all display inset coordinates must be finite.
+if (!all(is.finite(inset_right))) {
+  stop("Non-finite coordinates detected in inset_right.")
+}
+
+# ------------------------------------------------------------
+# DOTTED ZOOM CONNECTORS — PANELS (b), (c), (d)
+# ------------------------------------------------------------
+# The first displayed zoom is linked to left_zoom_box (P4 region).
+# The second displayed zoom is linked to right_zoom_box (upper field).
+# Endpoints are automatically anchored to the nearest rectangle borders.
+
+zoom_connector_df <- rbind(
+  make_zoom_connector(
+    display_box = inset_left,
+    source_box_sfc = left_zoom_box,
+    connector_id = "zoom_left"
+  ),
+  make_horizontal_right_connector(
+    display_box = inset_right,
+    source_box_sfc = right_zoom_box,
+    connector_id = "zoom_right"
+  )
+)
+
+zoom_boxes_sf <- rbind(
+  st_as_sf(left_zoom_box),
+  st_as_sf(right_zoom_box)
+)
+
+pB_main <- ggplot() +
+
+  geom_sf(
+    data = canopy_sf,
+    aes(fill = ndvi_mean),
+    color = "grey25",
+    linewidth = 0.16
+  ) +
+
+  geom_segment(
+    data = zoom_connector_df,
+    aes(
+      x = x,
+      y = y,
+      xend = xend,
+      yend = yend
+    ),
+    inherit.aes = FALSE,
+    color = "grey40",
+    linewidth = 0.38,
+    linetype = "22",
+    lineend = "round"
+  ) +
+
+  geom_sf(
+    data = zoom_boxes_sf,
+    fill = NA,
+    color = "#17365D",
+    linewidth = 0.65
+  ) +
+
+  # Enlarged views anchored inside the projected map area
+  annotation_custom(
+    grob = zoom_left_grob,
+    xmin = inset_left["xmin"],
+    xmax = inset_left["xmax"],
+    ymin = inset_left["ymin"],
+    ymax = inset_left["ymax"]
+  ) +
+
+  annotation_custom(
+    grob = zoom_right_grob,
+    xmin = inset_right["xmin"],
+    xmax = inset_right["xmax"],
+    ymin = inset_right["ymin"],
+    ymax = inset_right["ymax"]
+  ) +
+
+  scale_fill_gradientn(
+    colours = ndvi_palette,
+    limits = mean_limits,
+    breaks = mean_breaks,
+    oob = squish,
+    guide = "none"
+  ) +
+
+  north_arrow_layers(
+    x = north_x,
+    y = north_y,
+    size = 1.0
+  ) +
+
+  line_scalebar_layers(
+    x_left = scale_x,
+    y = scale_y,
+    length_m = 6,
+    text = "6 m"
+  ) +
+
+  coord_sf(
+    crs = st_crs(32618),
+    default_crs = st_crs(32618),
+    datum = st_crs(32618),
+    xlim = xlim_common,
+    ylim = ylim_common,
+    expand = FALSE,
+    clip = "on"
+  ) +
+
+  scale_x_continuous(
+    breaks = x_breaks,
+    labels = utm_labels
+  ) +
+
+  scale_y_continuous(
+    breaks = y_breaks,
+    labels = utm_labels
+  ) +
+
+  labs(
+    x = "Easting (m)",
+    y = "Northing (m)"
+  ) +
+
+  theme_map_pub() +
+
+  theme(
+    legend.position = "none"
+  )
+
+# ------------------------------------------------------------
+# 12. PANEL (b) LEGENDS
+# ------------------------------------------------------------
+
+mean_legend_plot <- ggplot(
+  data.frame(
+    x = 1,
+    y = 1,
+    z = mean(mean_limits)
+  ),
+  aes(
+    x = x,
+    y = y,
+    fill = z
+  )
+) +
+
+  geom_tile() +
+
+  scale_fill_gradientn(
+    colours = ndvi_palette,
+    limits = mean_limits,
+    breaks = mean_breaks,
+    labels = scales::label_number(
+      accuracy = 0.001,
+      trim = TRUE
+    ),
+    oob = squish,
+    name = "Mean NDVI",
+    guide = guide_colorbar(
+      title.position = "top",
+      title.hjust = 0.5,
+      barheight = unit(27, "mm"),
+      barwidth = unit(4.8, "mm"),
+      ticks = TRUE,
+      frame.colour = "grey45",
+      frame.linewidth = 0.25
+    )
+  ) +
+
+  theme_void() +
+
+  theme(
+    legend.position = "right",
+
+    legend.title = element_text(
+      size = TXT_LEGEND_TITLE,
+      face = "bold",
+      hjust = 0.5
+    ),
+
+    legend.text = element_text(
+      size = TXT_LEGEND_VALUE
+    ),
+
+    plot.margin = margin(
+      0,
+      2,
+      0,
+      0
+    )
+  )
+
+pixel_legend_plot <- ggplot(
+  data.frame(
+    x = 1,
+    y = 1,
+    z = mean(pixel_limits)
+  ),
+  aes(
+    x = x,
+    y = y,
+    fill = z
+  )
+) +
+
+  geom_tile() +
+
+  scale_fill_gradientn(
+    colours = ndvi_palette,
+    limits = pixel_limits,
+    breaks = pixel_breaks,
+    labels = scales::label_number(
+      accuracy = 0.01,
+      trim = TRUE
+    ),
+    oob = squish,
+    name = "Pixel NDVI",
+    guide = guide_colorbar(
+      title.position = "top",
+      title.hjust = 0.5,
+      barheight = unit(27, "mm"),
+      barwidth = unit(4.8, "mm"),
+      ticks = TRUE,
+      frame.colour = "grey45",
+      frame.linewidth = 0.25
+    )
+  ) +
+
+  theme_void() +
+
+  theme(
+    legend.position = "right",
+
+    legend.title = element_text(
+      size = TXT_LEGEND_TITLE,
+      face = "bold",
+      hjust = 0.5
+    ),
+
+    legend.text = element_text(
+      size = TXT_LEGEND_VALUE
+    ),
+
+    plot.margin = margin(
+      0,
+      2,
+      0,
+      0
+    )
+  )
+
+legend_mean <- cowplot::get_legend(
+  mean_legend_plot
+)
+
+legend_pixel <- cowplot::get_legend(
+  pixel_legend_plot
+)
+
+# ------------------------------------------------------------
+# LEGEND COLUMN — FINAL INSET ADJUSTMENT
+# ------------------------------------------------------------
+# The legend grobs are deliberately shifted inward from the
+# outer right edge. This preserves the two map panels at equal
+# visual scale while preventing legend titles/numbers from being
+# clipped by the figure boundary.
+
+# ------------------------------------------------------------
+# 13. COMPACT FINAL COMPOSITION
+# ------------------------------------------------------------
+# The large blank gap came from assigning the legends their own
+# full third column. Here the two map panels retain equal width,
+# and the legends are overlaid in a narrow strip immediately to
+# the right of panel (b), without changing map scale.
+
+maps_pair <- cowplot::plot_grid(
+  pA,
+  pB_main,
+  nrow = 1,
+  rel_widths = c(1.00, 1.00),
+  align = "hv",
+  axis = "tblr",
+  labels = c("(a)", "(b)"),
+  label_size = TXT_PANEL_TAG,
+  label_fontface = "bold",
+  label_x = c(0.015, 0.015),
+  label_y = c(0.985, 0.985),
+  hjust = 0,
+  vjust = 1
+)
+
+# Final canvas:
+# - maps use 92.5% of the width
+# - legends use only the remaining 7.5%
+# - legend strip begins almost immediately after panel (b)
+final_fig <- cowplot::ggdraw() +
+
+  cowplot::draw_plot(
+    maps_pair,
+    x = 0.000,
+    y = 0.000,
+    width = 0.925,
+    height = 1.000
+  ) +
+
+  cowplot::draw_grob(
+    legend_mean,
+    x = 0.915,
+    y = 0.585,
+    width = 0.082,
+    height = 0.285
+  ) +
+
+  cowplot::draw_grob(
+    legend_pixel,
+    x = 0.915,
+    y = 0.145,
+    width = 0.082,
+    height = 0.285
+  )
+
+# ------------------------------------------------------------
+# 14. SAVE
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# SAFE EXPORT
+# ------------------------------------------------------------
+# Use a new filename for this version so Windows/PowerPoint/Photos
+# cannot block overwriting a previously opened PNG.
+#
+# If the file already exists and is not locked, remove it first.
+if (file.exists(out_png)) {
+  removed_ok <- file.remove(out_png)
+
+  if (!removed_ok) {
+    stop(
+      "Could not overwrite the output PNG. ",
+      "Close the image in PowerPoint, Photos, Explorer preview, or any other app, ",
+      "then run the script again. Locked file: ",
+      out_png
+    )
+  }
+}
+
+# Explicit PNG device avoids ambiguity about the output format.
+ggsave(
+  filename = out_png,
+  plot = final_fig,
+  device = "png",
+  width = 15.2,
+  height = 6.2,
+  units = "in",
+  dpi = 600,
+  bg = "white"
+)
+
+if (!file.exists(out_png)) {
+  stop("The PNG export did not create the expected file: ", out_png)
+}
+
+cat("\n")
+cat("====================================================\n")
+cat("FIGURE A+B EXPORTED\n")
+cat("====================================================\n")
+cat(out_png, "\n")
+cat("CRS: EPSG:32618\n")
+cat("North arrow: unified in panels (a) and (b)\n")
+cat("Scale line: 6 m, outside crop\n")
+cat("Panel labels: closer to map frames\n")
+cat("Panel gap: reduced\n")
+cat("Zoom soil: excluded\n")
+cat("Zoom insets: anchored in UTM map coordinates\n")
+cat("Connector lines: subtle dotted guides drawn from each zoom to its source box\n")
+cat("Legends: compact overlay strip immediately right of panel (b)\n")
+
+
+# ============================================================
+# 15. EXTENSION TO PANELS (c) AND (d)
+#
+# IMPORTANT:
+# Everything above this line is the already-approved code for
+# panels (a) and (b). It is intentionally left unchanged.
+#
+# New panels:
+#   (c) MSAVI
+#   (d) WDRVI
+#
+# Scientific/cartographic rules inherited EXACTLY from panel (b):
+# - same EPSG:32618
+# - same map extent
+# - same north arrow
+# - same 6 m scale bar
+# - same typography
+# - same P4 and upper-field zoom source windows
+# - same displayed zoom positions and sizes
+# - same canopy-only mask in zooms (soil excluded)
+# - same object-level mean representation in the main map
+# - same P5-P95 stretch for object means
+# - same P2-P98 stretch for zoom pixels
+# - same blue-to-red palette
+# - same subtle dotted connector lines in panels (b), (c), and (d)
+#
+# Panels (a) and (b) are NOT rebuilt or modified here.
+# ============================================================
+
+msavi_file <- file.path(
+  flight_dir,
+  "msavi_20241002.tif"
+)
+
+wdrvi_file <- file.path(
+  flight_dir,
+  "wdrvi_20241002.tif"
+)
+
+if (!file.exists(msavi_file)) {
+  stop("Missing MSAVI file: ", msavi_file)
+}
+
+if (!file.exists(wdrvi_file)) {
+  stop("Missing WDRVI file: ", wdrvi_file)
+}
+
+msavi_r <- rast(
+  msavi_file
+)
+
+wdrvi_r <- rast(
+  wdrvi_file
+)
+
+if (!same.crs(msavi_r, "EPSG:32618")) {
+  msavi_r <- project(
+    msavi_r,
+    "EPSG:32618",
+    method = "bilinear"
+  )
+}
+
+if (!same.crs(wdrvi_r, "EPSG:32618")) {
+  wdrvi_r <- project(
+    wdrvi_r,
+    "EPSG:32618",
+    method = "bilinear"
+  )
+}
+
+# ------------------------------------------------------------
+# 16. GENERIC BUILDER FOR NEW SPECTRAL PANELS
+#
+# This function reproduces the APPROVED logic of panel (b).
+# It is used ONLY for (c) and (d), so the approved NDVI code
+# above remains untouched.
+# ------------------------------------------------------------
+
+build_additional_spectral_panel <- function(
+  raster_obj,
+  index_name
+) {
+
+  canopy_idx <- canopy_sf
+
+  # ----------------------------------------------------------
+  # Mean index per segmented canopy object
+  # ----------------------------------------------------------
+
+  ext_idx <- terra::extract(
+    raster_obj,
+    vect(canopy_idx),
+    fun = mean,
+    na.rm = TRUE
+  )
+
+  if (ncol(ext_idx) < 2) {
+    stop(
+      "Mean ",
+      index_name,
+      " extraction failed."
+    )
+  }
+
+  canopy_idx$index_mean <- ext_idx[[2]]
+
+  if (all(is.na(canopy_idx$index_mean))) {
+    stop(
+      "Mean ",
+      index_name,
+      " extraction failed: all values are NA."
+    )
+  }
+
+  # ----------------------------------------------------------
+  # Robust display limits for object means: P5-P95
+  # ----------------------------------------------------------
+
+  mean_limits_idx <- as.numeric(
+    quantile(
+      canopy_idx$index_mean,
+      probs = c(0.05, 0.95),
+      na.rm = TRUE
+    )
+  )
+
+  if (
+    !all(is.finite(mean_limits_idx)) ||
+      diff(mean_limits_idx) <= 0
+  ) {
+    mean_limits_idx <- range(
+      canopy_idx$index_mean,
+      na.rm = TRUE
+    )
+  }
+
+  # Same legend structure used in NDVI:
+  # 5 equally spaced ticks for object means.
+  mean_breaks_idx <- seq(
+    mean_limits_idx[1],
+    mean_limits_idx[2],
+    length.out = 5
+  )
+
+  # ----------------------------------------------------------
+  # Pixel values from EXACTLY the same two canopy-only zooms
+  # ----------------------------------------------------------
+
+  pixel_values_idx <- c(
+    get_zoom_values(
+      left_zoom_box,
+      canopy_idx,
+      raster_obj
+    ),
+    get_zoom_values(
+      right_zoom_box,
+      canopy_idx,
+      raster_obj
+    )
+  )
+
+  pixel_limits_idx <- as.numeric(
+    quantile(
+      pixel_values_idx,
+      probs = c(0.02, 0.98),
+      na.rm = TRUE
+    )
+  )
+
+  if (
+    !all(is.finite(pixel_limits_idx)) ||
+      diff(pixel_limits_idx) <= 0
+  ) {
+    pixel_limits_idx <- range(
+      pixel_values_idx,
+      na.rm = TRUE
+    )
+  }
+
+  # 4 equally spaced ticks for pixel-level zooms.
+  pixel_breaks_idx <- seq(
+    pixel_limits_idx[1],
+    pixel_limits_idx[2],
+    length.out = 4
+  )
+
+  # ----------------------------------------------------------
+  # Pixel-level zoom plots
+  # ----------------------------------------------------------
+
+  zoom_left_idx <- build_zoom_plot(
+    box_sfc = left_zoom_box,
+    canopy_sf = canopy_idx,
+    raster_obj = raster_obj,
+    pixel_limits = pixel_limits_idx,
+    pixel_palette = ndvi_palette
+  )
+
+  zoom_right_idx <- build_zoom_plot(
+    box_sfc = right_zoom_box,
+    canopy_sf = canopy_idx,
+    raster_obj = raster_obj,
+    pixel_limits = pixel_limits_idx,
+    pixel_palette = ndvi_palette
+  )
+
+  zoom_left_idx_grob <- ggplotGrob(
+    zoom_left_idx
+  )
+
+  zoom_right_idx_grob <- ggplotGrob(
+    zoom_right_idx
+  )
+
+  # ----------------------------------------------------------
+  # Main map — identical geometry/layout to approved panel (b)
+  # ----------------------------------------------------------
+
+  p_main_idx <- ggplot() +
+
+    geom_sf(
+      data = canopy_idx,
+      aes(fill = index_mean),
+      color = "grey25",
+      linewidth = 0.16
+    ) +
+
+    geom_segment(
+      data = zoom_connector_df,
+      aes(
+        x = x,
+        y = y,
+        xend = xend,
+        yend = yend
+      ),
+      inherit.aes = FALSE,
+      color = "grey40",
+      linewidth = 0.38,
+      linetype = "22",
+      lineend = "round"
+    ) +
+
+    geom_sf(
+      data = zoom_boxes_sf,
+      fill = NA,
+      color = "#17365D",
+      linewidth = 0.65
+    ) +
+
+    annotation_custom(
+      grob = zoom_left_idx_grob,
+      xmin = inset_left["xmin"],
+      xmax = inset_left["xmax"],
+      ymin = inset_left["ymin"],
+      ymax = inset_left["ymax"]
+    ) +
+
+    annotation_custom(
+      grob = zoom_right_idx_grob,
+      xmin = inset_right["xmin"],
+      xmax = inset_right["xmax"],
+      ymin = inset_right["ymin"],
+      ymax = inset_right["ymax"]
+    ) +
+
+    scale_fill_gradientn(
+      colours = ndvi_palette,
+      limits = mean_limits_idx,
+      breaks = mean_breaks_idx,
+      oob = squish,
+      guide = "none"
+    ) +
+
+    north_arrow_layers(
+      x = north_x,
+      y = north_y,
+      size = 1.0
+    ) +
+
+    line_scalebar_layers(
+      x_left = scale_x,
+      y = scale_y,
+      length_m = 6,
+      text = "6 m"
+    ) +
+
+    coord_sf(
+      crs = st_crs(32618),
+      default_crs = st_crs(32618),
+      datum = st_crs(32618),
+      xlim = xlim_common,
+      ylim = ylim_common,
+      expand = FALSE,
+      clip = "on"
+    ) +
+
+    scale_x_continuous(
+      breaks = x_breaks,
+      labels = utm_labels
+    ) +
+
+    scale_y_continuous(
+      breaks = y_breaks,
+      labels = utm_labels
+    ) +
+
+    labs(
+      x = "Easting (m)",
+      y = "Northing (m)"
+    ) +
+
+    theme_map_pub() +
+
+    theme(
+      legend.position = "none"
+    )
+
+  # ----------------------------------------------------------
+  # Mean legend
+  # ----------------------------------------------------------
+
+  mean_legend_plot_idx <- ggplot(
+    data.frame(
+      x = 1,
+      y = 1,
+      z = mean(mean_limits_idx)
+    ),
+    aes(
+      x = x,
+      y = y,
+      fill = z
+    )
+  ) +
+
+    geom_tile() +
+
+    scale_fill_gradientn(
+      colours = ndvi_palette,
+      limits = mean_limits_idx,
+      breaks = mean_breaks_idx,
+      labels = scales::label_number(
+        accuracy = 0.001,
+        trim = TRUE
+      ),
+      oob = squish,
+      name = paste(
+        "Mean",
+        index_name
+      ),
+      guide = guide_colorbar(
+        title.position = "top",
+        title.hjust = 0.5,
+        barheight = unit(
+          27,
+          "mm"
+        ),
+        barwidth = unit(
+          4.8,
+          "mm"
+        ),
+        ticks = TRUE,
+        frame.colour = "grey45",
+        frame.linewidth = 0.25
+      )
+    ) +
+
+    theme_void() +
+
+    theme(
+      legend.position = "right",
+
+      legend.title = element_text(
+        size = TXT_LEGEND_TITLE,
+        face = "bold",
+        hjust = 0.5
+      ),
+
+      legend.text = element_text(
+        size = TXT_LEGEND_VALUE
+      ),
+
+      plot.margin = margin(
+        0,
+        2,
+        0,
+        0
+      )
+    )
+
+  # ----------------------------------------------------------
+  # Pixel legend
+  # ----------------------------------------------------------
+
+  pixel_legend_plot_idx <- ggplot(
+    data.frame(
+      x = 1,
+      y = 1,
+      z = mean(pixel_limits_idx)
+    ),
+    aes(
+      x = x,
+      y = y,
+      fill = z
+    )
+  ) +
+
+    geom_tile() +
+
+    scale_fill_gradientn(
+      colours = ndvi_palette,
+      limits = pixel_limits_idx,
+      breaks = pixel_breaks_idx,
+      labels = scales::label_number(
+        accuracy = 0.01,
+        trim = TRUE
+      ),
+      oob = squish,
+      name = paste(
+        "Pixel",
+        index_name
+      ),
+      guide = guide_colorbar(
+        title.position = "top",
+        title.hjust = 0.5,
+        barheight = unit(
+          27,
+          "mm"
+        ),
+        barwidth = unit(
+          4.8,
+          "mm"
+        ),
+        ticks = TRUE,
+        frame.colour = "grey45",
+        frame.linewidth = 0.25
+      )
+    ) +
+
+    theme_void() +
+
+    theme(
+      legend.position = "right",
+
+      legend.title = element_text(
+        size = TXT_LEGEND_TITLE,
+        face = "bold",
+        hjust = 0.5
+      ),
+
+      legend.text = element_text(
+        size = TXT_LEGEND_VALUE
+      ),
+
+      plot.margin = margin(
+        0,
+        2,
+        0,
+        0
+      )
+    )
+
+  mean_legend_idx <- cowplot::get_legend(
+    mean_legend_plot_idx
+  )
+
+  pixel_legend_idx <- cowplot::get_legend(    pixel_legend_plot_idx
+  )
+
+  list(
+    main_plot = p_main_idx,
+    mean_legend = mean_legend_idx,
+    pixel_legend = pixel_legend_idx,
+    mean_limits = mean_limits_idx,
+    pixel_limits = pixel_limits_idx
+  )
+}
+
+# ------------------------------------------------------------
+# 17. BUILD PANEL (c): MSAVI
+# ------------------------------------------------------------
+
+panel_c_obj <- build_additional_spectral_panel(
+  raster_obj = msavi_r,
+  index_name = "MSAVI"
+)
+
+pC_main <- panel_c_obj$main_plot
+legend_mean_msavi <- panel_c_obj$mean_legend
+legend_pixel_msavi <- panel_c_obj$pixel_legend
+
+# ------------------------------------------------------------
+# 18. BUILD PANEL (d): WDRVI
+# ------------------------------------------------------------
+
+panel_d_obj <- build_additional_spectral_panel(
+  raster_obj = wdrvi_r,
+  index_name = "WDRVI"
+)
+
+pD_main <- panel_d_obj$main_plot
+legend_mean_wdrvi <- panel_d_obj$mean_legend
+legend_pixel_wdrvi <- panel_d_obj$pixel_legend
+
+# ------------------------------------------------------------
+# 19. INTERNAL LEGENDS FOR SPECTRAL PANELS
+#
+# The map geometry is NOT reduced.
+# The two legends are overlaid in the lower-right white space
+# of each spectral panel. This is the space gained by shifting
+# the lower zoom inset left.
+# ------------------------------------------------------------
+
+embed_internal_legends <- function(
+    main_plot,
+    mean_legend_grob,
+    pixel_legend_grob
+) {
+  
+  white_bg <- grid::rectGrob(
+    gp = grid::gpar(
+      fill = "white",
+      col  = NA
+    )
+  )
+  
+  cowplot::ggdraw() +
+    
+    cowplot::draw_plot(
+      main_plot,
+      x = 0,
+      y = 0,
+      width = 1,
+      height = 1,
+      scale = 1
+    ) +
+    
+    # Fondo blanco Mean
+    cowplot::draw_grob(
+      white_bg,
+      x = 0.625,
+      y = 0.230,
+      width = 0.135,
+      height = 0.285
+    ) +
+    
+    # Fondo blanco Pixel
+    cowplot::draw_grob(
+      white_bg,
+      x = 0.825,
+      y = 0.230,
+      width = 0.135,
+      height = 0.285
+    ) +
+    
+    # Mean legend
+    cowplot::draw_grob(
+      mean_legend_grob,
+      x = 0.640,
+      y = 0.240,
+      width = 0.100,
+      height = 0.255
+    ) +
+    
+    # Pixel legend
+    cowplot::draw_grob(
+      pixel_legend_grob,
+      x = 0.840,
+      y = 0.240,
+      width = 0.100,
+      height = 0.255
+    )
+}
+
+# ------------------------------------------------------------
+# 20. FOUR-PANEL 2 x 2 COMPOSITION
+#
+# IMPORTANT FIX FOR EQUAL MAP SCALE:
+# Panel (a) is also wrapped inside the same ggdraw/draw_plot canvas
+# logic used for the spectral panels. This preserves everything that
+# was already gained, while making the main map body visually equal
+# across panels (a), (b), (c) and (d).
+# ------------------------------------------------------------
+
+# Panel (a) wrapped into the same type of canvas used by panels (b-d)
+pA_final <- cowplot::ggdraw() +
+  cowplot::draw_plot(
+    pA,
+    x = 0,
+    y = 0,
+    width = 1,
+    height = 1,
+    scale = 1
+  )
+
+# Approved NDVI map + its own internal legends
+pB_final <- embed_internal_legends(
+  main_plot = pB_main,
+  mean_legend_grob = legend_mean,
+  pixel_legend_grob = legend_pixel
+)
+
+# MSAVI
+pC_final <- embed_internal_legends(
+  main_plot = pC_main,
+  mean_legend_grob = legend_mean_msavi,
+  pixel_legend_grob = legend_pixel_msavi
+)
+
+# WDRVI
+pD_final <- embed_internal_legends(
+  main_plot = pD_main,
+  mean_legend_grob = legend_mean_wdrvi,
+  pixel_legend_grob = legend_pixel_wdrvi
+)
+
+final_figure_4panels <- cowplot::plot_grid(
+  pA_final,
+  pB_final,
+  pC_final,
+  pD_final,
+  ncol = 2,
+  rel_widths = c(
+    1.00,
+    1.00
+  ),
+  rel_heights = c(
+    1.00,
+    1.00
+  ),
+  align = "hv",
+  axis = "tblr",
+  labels = c(
+    "(a)",
+    "(b)",
+    "(c)",
+    "(d)"
+  ),
+  label_size = TXT_PANEL_TAG,
+  label_fontface = "bold",
+  label_x = c(
+    0.015,
+    0.015,
+    0.015,
+    0.015
+  ),
+  label_y = c(
+    0.952,
+    0.952,
+    0.952,
+    0.952
+  ),
+  hjust = 0,
+  vjust = 1
+)
+
+# ------------------------------------------------------------
+# 22. EXPORT FOUR-PANEL FIGURE
+# ------------------------------------------------------------
+
+out_png_4 <- file.path(
+  fig_dir,
+  "Figure1_ABCD_R6_v26_PANEL_A_FINE_TUNING.png"
+)
+
+if (file.exists(out_png_4)) {
+
+  removed_ok_4 <- file.remove(
+    out_png_4
+  )
+
+  if (!removed_ok_4) {
+    stop(
+      "Could not overwrite the four-panel output PNG. ",
+      "Close it in PowerPoint, Photos, Explorer preview, or another app, ",
+      "then run the script again. Locked file: ",
+      out_png_4
+    )
+  }
+}
+
+ggsave(
+  filename = out_png_4,
+  plot = final_figure_4panels,
+  device = "png",
+  width = 15.6,
+  height = 11.4,
+  units = "in",
+  dpi = 600,
+  bg = "white"
+)
+
+if (!file.exists(out_png_4)) {
+  stop(
+    "The four-panel PNG export did not create the expected file: ",
+    out_png_4
+  )
+}
+
+cat("\n")
+cat("====================================================\n")
+cat("FOUR-PANEL FIGURE EXPORTED\n")
+cat("====================================================\n")
+cat(out_png_4, "\n")
+cat("Panels (a)–(d): same EPSG:32618 extent and same visual map-body scale\n")
+cat("Panel (a) wrapped into the same canvas logic as panels (b)–(d)\n")
+cat("Mean + Pixel legends embedded inside panels (b), (c), and (d)\n")
+cat("Second zoom moved beside upper zoom; upper zoom unchanged\n")
+cat("Internal Mean + Pixel legends with white background boxes\n")
+cat("Same zoom source windows and inset positions in (b), (c), (d)\n")
+cat("Soil excluded from all zooms\n")
+cat("Object means: P5-P95 display stretch\n")
+cat("Zoom pixels: P2-P98 display stretch\n")
+cat("Original raster values were NOT modified\n")
+cat("Dotted zoom connectors: enabled in panels (b), (c), and (d)\n")
