@@ -1,0 +1,2 @@
+"variable_x","variable_y","n","pearson_r","spearman_rho","interpretation"
+"N_rate_kg_ha","grain_yield_t_ha",5,0.619275118307777,0.8,"Exploratory descriptive association only; one subplot per N rate."
