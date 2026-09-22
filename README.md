@@ -241,6 +241,30 @@ The dataset and scripts are appropriate for:
 
 Because the nitrogen rates were not independently replicated, treatment-response relationships should not be interpreted as confirmatory causal effects, statistically validated fertilizer optima, or generalized fertilizer recommendations.
 
+## Reproducible R environment
+
+The exact package environment should be captured with `renv` from the local
+R installation used to run the manuscript workflow. The repository includes
+instructions in [docs/reproducibility.md](docs/reproducibility.md).
+
+After environment capture, the repository should contain `renv.lock` and
+`sessionInfo.txt`. A third party can then restore the recorded package
+versions with:
+
+```r
+install.packages("renv")
+renv::restore()
+```
+
+## License
+
+R source code in `scripts/` is licensed under the MIT License; see
+[LICENSE](LICENSE).
+
+Data tables, derived analytical outputs, and documentation are licensed under
+the Creative Commons Attribution 4.0 International License (CC BY 4.0), unless
+otherwise stated; see [LICENSE-DATA.md](LICENSE-DATA.md).
+
 ## Citation
 
 If you use these data or scripts, please cite the associated manuscript when available.

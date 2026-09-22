@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# renv local libraries and transient state
+renv/library/
+renv/staging/
+renv/python/
+renv/sandbox/
