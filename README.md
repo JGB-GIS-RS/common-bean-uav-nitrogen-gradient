@@ -61,22 +61,20 @@ common-bean-uav-nitrogen-gradient/
 ├── derived/
 │   ├── canopy_summary_by_subplot.csv
 │   ├── qa_canopy_geopackages.csv
-│   ├── qa_spatial_extraction.csv
-│   ├── descriptive_summary_by_flight.csv
-│   ├── exploratory_yield_associations_by_flight.csv
-│   └── final_harvest_by_subplot.csv
+│   └── qa_spatial_extraction.csv
 │
 ├── scripts/
 │   ├── 00_build_canopy_geopackages.R
 │   ├── 01_extract_canopy_statistics.R
 │   ├── 02_build_master_dataset.R
 │   ├── 03_descriptive_analysis.R
-│   ├── 04_yield_association_figure.R
-│   ├── 05_multitemporal_uav_figure.R
-│   └── 06_spatial_spectral_figure_R6.R
+│   ├── 04_figure_3_spatial_characterization_R6.R
+│   ├── 05_figure_4_multitemporal_uav_metrics.R
+│   ├── 06_figure_5_uav_yield_correlations.R
+│   └── 07_figure_6_final_grain_yield.R
 │
 ├── figures/
-│   └── [generated manuscript figures]
+│   └── [generated locally; not currently tracked]
 │
 └── docs/
     └── data_dictionary.md
@@ -131,32 +129,31 @@ data/common_bean_uav_master_dataset.csv
                 ↓
 03_descriptive_analysis.R
                 ↓
-Descriptive summaries + stage-specific exploratory UAV–yield associations
+Descriptive summaries + stage-specific exploratory associations
                 ↓
-       ┌───────────────┬─────────────────────┐
-       ↓               ↓                     ↓
-04_yield_       05_multitemporal_    06_spatial_spectral_
-association_    uav_figure.R         figure_R6.R
-figure.R
-       ↓               ↓                     ↓
-Stage-specific   Multitemporal       Spatial/spectral
-association      canopy and index    R6 figure
-figure           figure
+        ┌──────────────────────┬──────────────────────┬──────────────────────┬──────────────────────┐
+        ↓                      ↓                      ↓                      ↓
+04_figure_3_             05_figure_4_            06_figure_5_            07_figure_6_
+spatial_                  multitemporal_           uav_yield_              final_grain_
+characterization_R6.R     uav_metrics.R            correlations.R           yield.R
+        ↓                      ↓                      ↓                      ↓
+Manuscript Figure 3      Manuscript Figure 4      Manuscript Figure 5      Manuscript Figure 6
 ```
 
 ### Script descriptions
 
 | Script | Purpose | Main input(s) | Main output(s) |
 |---|---|---|---|
-| `00_build_canopy_geopackages.R` | Optional preparation step that consolidates P1–P5 canopy shapefiles into one GeoPackage per UAV flight and checks feature counts and area preservation. | Subplot canopy shapefiles | `canopy_YYYYMMDD.gpkg`; `derived/qa_canopy_geopackages.csv` |
-| `01_extract_canopy_statistics.R` | Extracts subplot-level projected canopy area and spectral-index statistics from final NDVI, MSAVI and WDRVI rasters within the segmented canopy. Duplicate raster cells are removed before summary statistics are calculated. | Canopy GeoPackages; NDVI/MSAVI/WDRVI rasters | `derived/canopy_summary_by_subplot.csv`; extraction QA files |
+| `00_build_canopy_geopackages.R` | Optional preparation step that consolidates P1–P5 canopy shapefiles into one GeoPackage per UAV flight and validates feature counts and area preservation. | Subplot canopy shapefiles | `canopy_YYYYMMDD.gpkg`; `derived/qa_canopy_geopackages.csv` |
+| `01_extract_canopy_statistics.R` | Extracts subplot-level projected canopy area and spectral-index statistics from final NDVI, MSAVI and WDRVI rasters within the segmented canopy. | Canopy GeoPackages; NDVI/MSAVI/WDRVI rasters | `derived/canopy_statistics_by_subplot_index.csv`; `derived/canopy_summary_by_subplot.csv`; `derived/qa_spatial_extraction.csv` |
 | `02_build_master_dataset.R` | Joins canopy summaries with harvest data and constructs the canonical 25-row longitudinal dataset. | Canopy summary; harvest data | `data/common_bean_uav_master_dataset.csv` |
-| `03_descriptive_analysis.R` | Produces descriptive summaries and stage-specific exploratory Pearson correlations between UAV-derived metrics and final grain yield. | Canonical master dataset | Descriptive and UAV–yield association tables in `derived/` |
-| `04_yield_association_figure.R` | Generates the stage-specific UAV–yield association figure from the exploratory Pearson coefficients. | Master/derived association data | Manuscript-ready association figure |
-| `05_multitemporal_uav_figure.R` | Generates the four-panel multitemporal figure for projected canopy area, NDVI, MSAVI and WDRVI across V4–R8. | Canonical master dataset | Manuscript-ready multitemporal figure |
-| `06_spatial_spectral_figure_R6.R` | Generates the R6 spatial/spectral figure using the segmented canopy and spectral-index rasters. Display percentiles are used only for visualization and do not modify the original raster values. | R6 canopy and spectral rasters | Manuscript-ready R6 spatial/spectral figure |
+| `03_descriptive_analysis.R` | Produces descriptive summaries, exploratory associations with N rate, stage-specific UAV–yield correlations, and the final harvest table. | Canonical master dataset | Analytical tables and notes in `derived/` |
+| `04_figure_3_spatial_characterization_R6.R` | Reproduces manuscript Figure 3: R6 canopy segmentation and spatial NDVI, MSAVI and WDRVI characterization. | R6 canopy GeoPackage and spectral rasters | Manuscript Figure 3 |
+| `05_figure_4_multitemporal_uav_metrics.R` | Reproduces manuscript Figure 4: multitemporal projected canopy area and mean NDVI, MSAVI and WDRVI trajectories from V4 to R8. | Canonical master dataset | `figures/Figure_4_multitemporal_UAV_response.png` |
+| `06_figure_5_uav_yield_correlations.R` | Reproduces manuscript Figure 5: heatmap of stage-specific exploratory Pearson correlations between UAV-derived metrics and final grain yield. | `derived/exploratory_yield_associations_by_flight.csv` | `figures/Figure_5_UAV_yield_associations.png` |
+| `07_figure_6_final_grain_yield.R` | Reproduces manuscript Figure 6: observed final grain yield for the five subplot/N-rate combinations. | Canonical master dataset | `figures/Figure_6_final_grain_yield.png` |
 
-`00_build_canopy_geopackages.R` is optional when the consolidated GeoPackages are already available. Scripts `01`–`03` form the principal data-to-analysis chain. Scripts `04`–`06` reproduce analytical and cartographic figures used in the manuscript workflow.
+`00_build_canopy_geopackages.R` is optional when the consolidated GeoPackages are already available. Scripts `01`–`03` form the principal data-to-analysis chain. Scripts `04`–`07` reproduce manuscript Figures 3–6. Running `03_descriptive_analysis.R` generates the additional analytical tables required by Figure 5; these generated files are not currently tracked in the repository.
 
 ## Software requirements
 
@@ -164,6 +161,7 @@ The workflow is implemented in R. Depending on the script, the following package
 
 - `terra`
 - `ggplot2`
+- `patchwork`
 - `sf`
 - `dplyr`
 - `cowplot`

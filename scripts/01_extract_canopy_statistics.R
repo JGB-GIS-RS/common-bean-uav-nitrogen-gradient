@@ -1,12 +1,28 @@
 # ============================================================
 # 01_extract_canopy_statistics.R
 #
-# Extracts subplot-level canopy statistics from the final
-# NDVI, MSAVI and WDRVI rasters using one canopy GeoPackage
-# per UAV flight.
+# Purpose
+# -------
+# Extracts canopy-level statistics from the final UAV spectral-index
+# rasters using the consolidated canopy GeoPackage for each flight.
 #
-# Expected working directory: repository root.
+# Inputs per flight
+# -----------------
+#   data/spatial/flightXX/ndvi_YYYYMMDD.tif
+#   data/spatial/flightXX/msavi_YYYYMMDD.tif
+#   data/spatial/flightXX/wdrvi_YYYYMMDD.tif
+#   data/spatial/flightXX/canopy_YYYYMMDD.gpkg
+#
+# Outputs
+# -------
+#   derived/canopy_statistics_by_subplot_index.csv
+#   derived/canopy_summary_by_subplot.csv
+#   derived/qa_spatial_extraction.csv
+#
+# Notes
+# -----
 # No input file is modified.
+# Expected working directory: repository root.
 # ============================================================
 
 rm(list = ls())
@@ -14,133 +30,424 @@ gc()
 
 library(terra)
 
-project_root <- normalizePath(".", winslash = "/", mustWork = TRUE)
-spatial_root <- file.path(project_root, "data", "spatial")
-derived_root <- file.path(project_root, "derived")
+# ------------------------------------------------------------
+# 1. PROJECT PATHS
+# ------------------------------------------------------------
+
+project_root <- normalizePath(
+  ".",
+  winslash = "/",
+  mustWork = TRUE
+)
+
+spatial_root <- file.path(
+  project_root,
+  "data",
+  "spatial"
+)
+
+derived_root <- file.path(
+  project_root,
+  "derived"
+)
 
 if (!dir.exists(spatial_root)) {
-  stop("Directory not found: ", spatial_root,
-       "\nOpen the RStudio project from the repository root.")
+  stop(
+    "Directory not found: ",
+    spatial_root,
+    "\n\nOpen the RStudio project located at:\n",
+    "C:/common-bean-uav-nitrogen-gradient"
+  )
 }
-if (!dir.exists(derived_root)) dir.create(derived_root, recursive = TRUE)
+
+if (!dir.exists(derived_root)) {
+  dir.create(
+    derived_root,
+    recursive = TRUE
+  )
+}
+
+# ------------------------------------------------------------
+# 2. FLIGHT METADATA
+# ------------------------------------------------------------
 
 flights <- data.frame(
   flight = 1:5,
-  folder = sprintf("flight%02d", 1:5),
-  date = c("2024-09-07","2024-09-14","2024-10-02","2024-10-09","2024-10-16"),
-  file_date = c("20240907","20240914","20241002","20241009","20241016"),
-  growth_stage = c("V4","R5","R6","R7","R8"),
+  folder = c(
+    "flight01",
+    "flight02",
+    "flight03",
+    "flight04",
+    "flight05"
+  ),
+  date = c(
+    "2024-09-07",
+    "2024-09-14",
+    "2024-10-02",
+    "2024-10-09",
+    "2024-10-16"
+  ),
+  file_date = c(
+    "20240907",
+    "20240914",
+    "20241002",
+    "20241009",
+    "20241016"
+  ),
+  growth_stage = c(
+    "V4",
+    "R5",
+    "R6",
+    "R7",
+    "R8"
+  ),
   stringsAsFactors = FALSE
 )
 
+# ------------------------------------------------------------
+# 3. EXTRACTION FUNCTION
+# ------------------------------------------------------------
+
 extract_stats <- function(r, v) {
 
-  if (!same.crs(v, r)) v <- project(v, crs(r))
+  if (!same.crs(v, r)) {
+    v <- project(
+      v,
+      crs(r)
+    )
+  }
 
-  canopy_area_m2 <- sum(expanse(v, unit = "m"), na.rm = TRUE)
+  canopy_area_m2 <- sum(
+    expanse(
+      v,
+      unit = "m"
+    ),
+    na.rm = TRUE
+  )
 
-  d <- terra::extract(r, v, ID = TRUE, cells = TRUE)
+  d <- terra::extract(
+    r,
+    v,
+    ID = TRUE,
+    cells = TRUE
+  )
+
   value_col <- names(r)[1]
-  d <- d[is.finite(d[[value_col]]), ]
 
-  n_duplicate_cells <- sum(duplicated(d$cell))
-  d <- d[!duplicated(d$cell), ]
+  d <- d[
+    is.finite(
+      d[[value_col]]
+    ),
+  ]
+
+  n_duplicate_cells <- sum(
+    duplicated(
+      d$cell
+    )
+  )
+
+  d <- d[
+    !duplicated(
+      d$cell
+    ),
+  ]
 
   x <- d[[value_col]]
-  if (length(x) == 0) stop("No valid raster cells were extracted.")
 
-  expected_pixels <- canopy_area_m2 / prod(res(r))
-  coverage_pct <- 100 * length(x) / expected_pixels
+  if (length(x) == 0) {
+    stop(
+      "No valid raster cells were extracted."
+    )
+  }
 
-  n_below_minus1 <- sum(x < -1, na.rm = TRUE)
-  n_above_1 <- sum(x > 1, na.rm = TRUE)
+  pixel_area_m2 <- prod(
+    res(r)
+  )
+
+  expected_pixels <-
+    canopy_area_m2 /
+    pixel_area_m2
+
+  coverage_pct <-
+    100 *
+    length(x) /
+    expected_pixels
+
+  n_below_minus1 <- sum(
+    x < -1,
+    na.rm = TRUE
+  )
+
+  n_above_1 <- sum(
+    x > 1,
+    na.rm = TRUE
+  )
 
   data.frame(
     canopy_area_m2 = canopy_area_m2,
     n_pixels = length(x),
     n_duplicate_cells_removed = n_duplicate_cells,
     coverage_pct = coverage_pct,
-    mean = mean(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    p05 = as.numeric(quantile(x, 0.05, na.rm = TRUE)),
-    p25 = as.numeric(quantile(x, 0.25, na.rm = TRUE)),
-    p75 = as.numeric(quantile(x, 0.75, na.rm = TRUE)),
-    p95 = as.numeric(quantile(x, 0.95, na.rm = TRUE)),
-    p99 = as.numeric(quantile(x, 0.99, na.rm = TRUE)),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
+    mean = mean(
+      x,
+      na.rm = TRUE
+    ),
+    median = median(
+      x,
+      na.rm = TRUE
+    ),
+    sd = sd(
+      x,
+      na.rm = TRUE
+    ),
+    p05 = as.numeric(
+      quantile(
+        x,
+        0.05,
+        na.rm = TRUE
+      )
+    ),
+    p25 = as.numeric(
+      quantile(
+        x,
+        0.25,
+        na.rm = TRUE
+      )
+    ),
+    p75 = as.numeric(
+      quantile(
+        x,
+        0.75,
+        na.rm = TRUE
+      )
+    ),
+    p95 = as.numeric(
+      quantile(
+        x,
+        0.95,
+        na.rm = TRUE
+      )
+    ),
+    p99 = as.numeric(
+      quantile(
+        x,
+        0.99,
+        na.rm = TRUE
+      )
+    ),
+    min = min(
+      x,
+      na.rm = TRUE
+    ),
+    max = max(
+      x,
+      na.rm = TRUE
+    ),
     n_below_minus1 = n_below_minus1,
     n_above_1 = n_above_1,
     pct_outside_minus1_1 =
-      100 * (n_below_minus1 + n_above_1) / length(x)
+      100 *
+      (n_below_minus1 + n_above_1) /
+      length(x)
   )
 }
 
+# ------------------------------------------------------------
+# 4. PROCESS ALL FLIGHTS
+# ------------------------------------------------------------
+
 results <- list()
 qa_rows <- list()
+
 k <- 1
 q <- 1
 
 for (i in seq_len(nrow(flights))) {
 
   flight_id <- flights$flight[i]
-  flight_dir <- file.path(spatial_root, flights$folder[i])
+  folder_name <- flights$folder[i]
   date_txt <- flights$date[i]
   file_date <- flights$file_date[i]
-  stage <- flights$growth_stage[i]
+  growth_stage <- flights$growth_stage[i]
+
+  flight_dir <- file.path(
+    spatial_root,
+    folder_name
+  )
+
+  cat("\n")
+  cat("====================================================\n")
+  cat(
+    "FLIGHT ",
+    flight_id,
+    " | ",
+    date_txt,
+    " | ",
+    growth_stage,
+    "\n",
+    sep = ""
+  )
+  cat("====================================================\n")
 
   raster_files <- c(
-    NDVI = file.path(flight_dir, paste0("ndvi_", file_date, ".tif")),
-    MSAVI = file.path(flight_dir, paste0("msavi_", file_date, ".tif")),
-    WDRVI = file.path(flight_dir, paste0("wdrvi_", file_date, ".tif"))
+    NDVI = file.path(
+      flight_dir,
+      paste0(
+        "ndvi_",
+        file_date,
+        ".tif"
+      )
+    ),
+    MSAVI = file.path(
+      flight_dir,
+      paste0(
+        "msavi_",
+        file_date,
+        ".tif"
+      )
+    ),
+    WDRVI = file.path(
+      flight_dir,
+      paste0(
+        "wdrvi_",
+        file_date,
+        ".tif"
+      )
+    )
   )
-  gpkg_file <- file.path(flight_dir, paste0("canopy_", file_date, ".gpkg"))
 
-  if (any(!file.exists(raster_files))) {
-    stop("One or more spectral rasters are missing in ", flight_dir)
+  gpkg_file <- file.path(
+    flight_dir,
+    paste0(
+      "canopy_",
+      file_date,
+      ".gpkg"
+    )
+  )
+
+  missing_rasters <- raster_files[
+    !file.exists(
+      raster_files
+    )
+  ]
+
+  if (length(missing_rasters) > 0) {
+    stop(
+      "Missing raster(s):\n",
+      paste(
+        missing_rasters,
+        collapse = "\n"
+      )
+    )
   }
-  if (!file.exists(gpkg_file)) stop("Missing GeoPackage: ", gpkg_file)
 
-  rasters <- lapply(raster_files, rast)
-  for (idx in names(rasters)) names(rasters[[idx]]) <- idx
+  if (!file.exists(gpkg_file)) {
+    stop(
+      "Missing GeoPackage:\n",
+      gpkg_file
+    )
+  }
 
-  canopy_all <- vect(gpkg_file, layer = "canopy")
+  rasters <- lapply(
+    raster_files,
+    rast
+  )
+
+  for (idx in names(rasters)) {
+    names(
+      rasters[[idx]]
+    ) <- idx
+  }
+
+  canopy_all <- vect(
+    gpkg_file,
+    layer = "canopy"
+  )
 
   required_fields <- c(
-    "flight","date","growth_stage","subplot",
-    "N_rate_kg_ha","canopy_object_id"
+    "flight",
+    "date",
+    "growth_stage",
+    "subplot",
+    "N_rate_kg_ha",
+    "canopy_object_id"
   )
-  if (!all(required_fields %in% names(canopy_all))) {
-    stop("GeoPackage is missing required fields: ", gpkg_file)
+
+  if (!all(
+    required_fields %in%
+      names(canopy_all)
+  )) {
+    stop(
+      "GeoPackage is missing one or more required fields:\n",
+      gpkg_file
+    )
   }
 
-  for (subplot in paste0("P", 1:5)) {
+  subplots <- c(
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5"
+  )
 
-    canopy <- canopy_all[canopy_all$subplot == subplot, ]
-    if (nrow(canopy) == 0) stop("No canopy polygons found for ", subplot)
+  for (subplot in subplots) {
 
-    N_rate_value <- unique(canopy$N_rate_kg_ha)
-    if (length(N_rate_value) != 1) {
-      stop("Multiple N rates detected for ", subplot)
+    canopy <- canopy_all[
+      canopy_all$subplot == subplot,
+    ]
+
+    if (nrow(canopy) == 0) {
+      stop(
+        "No canopy polygons found for ",
+        subplot,
+        " in ",
+        basename(
+          gpkg_file
+        )
+      )
     }
 
-    n_objects <- nrow(canopy)
+    N_rate_value <- unique(
+      canopy$N_rate_kg_ha
+    )
+
+    if (length(N_rate_value) != 1) {
+      stop(
+        "Multiple N rates detected for ",
+        subplot,
+        " in ",
+        basename(
+          gpkg_file
+        )
+      )
+    }
+
+    n_canopy_objects <- nrow(
+      canopy
+    )
+
     subplot_results <- list()
 
     for (idx in names(rasters)) {
 
-      z <- extract_stats(rasters[[idx]], canopy)
+      z <- extract_stats(
+        rasters[[idx]],
+        canopy
+      )
 
       row <- cbind(
         data.frame(
           flight = flight_id,
           date = date_txt,
-          growth_stage = stage,
+          growth_stage = growth_stage,
           subplot = subplot,
-          N_rate_kg_ha = as.numeric(N_rate_value),
+          N_rate_kg_ha = as.numeric(
+            N_rate_value
+          ),
           index = idx,
-          canopy_polygon_count = n_objects,
+          canopy_polygon_count =
+            n_canopy_objects,
           stringsAsFactors = FALSE
         ),
         z
@@ -151,39 +458,102 @@ for (i in seq_len(nrow(flights))) {
       k <- k + 1
     }
 
-    areas <- sapply(subplot_results, function(z) z$canopy_area_m2)
-    coverages <- sapply(subplot_results, function(z) z$coverage_pct)
-    outside <- sapply(subplot_results, function(z) z$pct_outside_minus1_1)
+    area_values <- sapply(
+      subplot_results,
+      function(z) {
+        z$canopy_area_m2
+      }
+    )
+
+    coverage_values <- sapply(
+      subplot_results,
+      function(z) {
+        z$coverage_pct
+      }
+    )
+
+    outside_values <- sapply(
+      subplot_results,
+      function(z) {
+        z$pct_outside_minus1_1
+      }
+    )
 
     qa_rows[[q]] <- data.frame(
       flight = flight_id,
       date = date_txt,
-      growth_stage = stage,
+      growth_stage = growth_stage,
       subplot = subplot,
-      N_rate_kg_ha = as.numeric(N_rate_value),
-      canopy_polygon_count = n_objects,
-      canopy_area_m2 = mean(areas),
-      canopy_area_range_m2 = max(areas) - min(areas),
-      minimum_coverage_pct = min(coverages),
-      maximum_coverage_pct = max(coverages),
-      maximum_pct_outside_minus1_1 = max(outside),
+      N_rate_kg_ha = as.numeric(
+        N_rate_value
+      ),
+      canopy_polygon_count =
+        n_canopy_objects,
+      canopy_area_m2 = mean(
+        area_values
+      ),
+      canopy_area_range_m2 =
+        max(area_values) -
+        min(area_values),
+      minimum_coverage_pct = min(
+        coverage_values
+      ),
+      maximum_coverage_pct = max(
+        coverage_values
+      ),
+      maximum_pct_outside_minus1_1 = max(
+        outside_values
+      ),
       stringsAsFactors = FALSE
     )
+
     q <- q + 1
   }
 }
 
-long_table <- do.call(rbind, results)
-qa_table <- do.call(rbind, qa_rows)
+# ------------------------------------------------------------
+# 5. CONSOLIDATE LONG TABLE
+# ------------------------------------------------------------
+
+long_table <- do.call(
+  rbind,
+  results
+)
+
+qa_table <- do.call(
+  rbind,
+  qa_rows
+)
+
+# ------------------------------------------------------------
+# 6. BUILD 25-ROW SUMMARY
+# ------------------------------------------------------------
 
 pick_index <- function(index_name) {
-  z <- long_table[long_table$index == index_name, ]
-  z[order(z$flight, z$N_rate_kg_ha), ]
+
+  z <- long_table[
+    long_table$index == index_name,
+  ]
+
+  z[
+    order(
+      z$flight,
+      z$N_rate_kg_ha
+    ),
+  ]
 }
 
-ndvi <- pick_index("NDVI")
-msavi <- pick_index("MSAVI")
-wdrvi <- pick_index("WDRVI")
+ndvi <- pick_index(
+  "NDVI"
+)
+
+msavi <- pick_index(
+  "MSAVI"
+)
+
+wdrvi <- pick_index(
+  "WDRVI"
+)
 
 summary_25 <- data.frame(
   flight = ndvi$flight,
@@ -192,43 +562,171 @@ summary_25 <- data.frame(
   subplot = ndvi$subplot,
   N_rate_kg_ha = ndvi$N_rate_kg_ha,
   canopy_area_m2 = ndvi$canopy_area_m2,
-  canopy_polygon_count = ndvi$canopy_polygon_count,
+  canopy_polygon_count =
+    ndvi$canopy_polygon_count,
+
   NDVI_mean = ndvi$mean,
   NDVI_median = ndvi$median,
   NDVI_sd = ndvi$sd,
+
   MSAVI_mean = msavi$mean,
   MSAVI_median = msavi$median,
   MSAVI_sd = msavi$sd,
+
   WDRVI_mean = wdrvi$mean,
   WDRVI_median = wdrvi$median,
   WDRVI_sd = wdrvi$sd,
+
   stringsAsFactors = FALSE
 )
 
-stopifnot(nrow(long_table) == 75)
-stopifnot(nrow(summary_25) == 25)
-stopifnot(nrow(qa_table) == 25)
+# ------------------------------------------------------------
+# 7. AUTOMATIC QA
+# ------------------------------------------------------------
+
+if (nrow(long_table) != 75) {
+  stop(
+    "Expected 75 rows in long table; found ",
+    nrow(long_table)
+  )
+}
+
+if (nrow(summary_25) != 25) {
+  stop(
+    "Expected 25 rows in summary table; found ",
+    nrow(summary_25)
+  )
+}
+
+if (nrow(qa_table) != 25) {
+  stop(
+    "Expected 25 rows in QA table; found ",
+    nrow(qa_table)
+  )
+}
+
+if (
+  any(!is.finite(
+    summary_25$NDVI_mean
+  )) ||
+  any(!is.finite(
+    summary_25$MSAVI_mean
+  )) ||
+  any(!is.finite(
+    summary_25$WDRVI_mean
+  ))
+) {
+  stop(
+    "Non-finite spectral means detected."
+  )
+}
+
+# ------------------------------------------------------------
+# 8. SAVE OUTPUTS
+# ------------------------------------------------------------
 
 write.csv(
   long_table,
-  file.path(derived_root, "canopy_statistics_by_subplot_index.csv"),
-  row.names = FALSE
-)
-write.csv(
-  summary_25,
-  file.path(derived_root, "canopy_summary_by_subplot.csv"),
-  row.names = FALSE
-)
-write.csv(
-  qa_table,
-  file.path(derived_root, "qa_spatial_extraction.csv"),
+  file.path(
+    derived_root,
+    "canopy_statistics_by_subplot_index.csv"
+  ),
   row.names = FALSE
 )
 
-cat("\n====================================================\n")
-cat("CANOPY EXTRACTION COMPLETED\n")
+write.csv(
+  summary_25,
+  file.path(
+    derived_root,
+    "canopy_summary_by_subplot.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  qa_table,
+  file.path(
+    derived_root,
+    "qa_spatial_extraction.csv"
+  ),
+  row.names = FALSE
+)
+
+# ------------------------------------------------------------
+# 9. CONSOLE SUMMARY
+# ------------------------------------------------------------
+
+cat("\n")
 cat("====================================================\n")
-cat("Long table rows: ", nrow(long_table), "\n", sep = "")
-cat("Summary rows:    ", nrow(summary_25), "\n", sep = "")
-cat("QA rows:         ", nrow(qa_table), "\n", sep = "")
-cat("\nNo input raster or vector file was modified.\n")
+cat("CANOPY EXTRACTION COMPLETED\n")
+cat("====================================================\n\n")
+
+cat(
+  "Long table rows: ",
+  nrow(long_table),
+  "\n",
+  sep = ""
+)
+
+cat(
+  "Summary rows:    ",
+  nrow(summary_25),
+  "\n",
+  sep = ""
+)
+
+cat(
+  "QA rows:         ",
+  nrow(qa_table),
+  "\n",
+  sep = ""
+)
+
+cat("\nMinimum coverage by flight:\n")
+
+print(
+  aggregate(
+    minimum_coverage_pct ~
+      flight +
+      date +
+      growth_stage,
+    data = qa_table,
+    FUN = min
+  ),
+  row.names = FALSE
+)
+
+cat("\nMean values by flight:\n")
+
+flight_means <- aggregate(
+  cbind(
+    NDVI_mean,
+    MSAVI_mean,
+    WDRVI_mean,
+    canopy_area_m2
+  ) ~
+    flight +
+    date +
+    growth_stage,
+  data = summary_25,
+  FUN = mean
+)
+
+print(
+  flight_means,
+  row.names = FALSE
+)
+
+cat("\nOutputs written to:\n")
+cat(
+  derived_root,
+  "\n\n"
+)
+
+cat(
+  "No input raster or vector file was modified.\n"
+)
+
+# ============================================================
+# END
+# ============================================================

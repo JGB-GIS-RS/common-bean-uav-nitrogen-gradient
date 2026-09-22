@@ -1,10 +1,24 @@
 # ============================================================
 # 02_build_master_dataset.R
 #
-# Builds the canonical 25-row analysis dataset from:
+# Purpose
+# -------
+# Builds the canonical 25-row analytical dataset by integrating
+# subplot-level UAV canopy metrics with final harvest measurements.
+#
+# Inputs
+# ------
 #   derived/canopy_summary_by_subplot.csv
 #   data/field/harvest_data.csv
 #
+# Output
+# ------
+#   data/common_bean_uav_master_dataset.csv
+#
+# Notes
+# -----
+# Final grain yield is measured once per subplot and repeated across
+# flight rows only to preserve the longitudinal data structure.
 # Expected working directory: repository root.
 # ============================================================
 
