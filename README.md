@@ -47,6 +47,14 @@ The UAV platform was a DJI Phantom 3 Professional equipped with a MAPIR Survey2 
 common-bean-uav-nitrogen-gradient/
 │
 ├── README.md
+├── LICENSE
+├── LICENSE-DATA.md
+├── .gitignore
+├── .Rprofile
+├── common-bean-uav-nitrogen-gradient.Rproj
+├── renv.lock
+├── sessionInfo.txt
+│
 ├── data/
 │   ├── common_bean_uav_master_dataset.csv
 │   ├── field/
@@ -83,8 +91,14 @@ common-bean-uav-nitrogen-gradient/
 ├── figures/
 │   └── [generated locally; not currently tracked]
 │
+├── renv/
+│   ├── activate.R
+│   ├── settings.json
+│   └── .gitignore
+│
 └── docs/
-    └── data_dictionary.md
+    ├── data_dictionary.md
+    └── reproducibility.md
 ```
 
 The `data/spatial/` directories describe the expected local project structure. The large spatial files are not currently tracked in GitHub; see **Spatial inputs** below.
