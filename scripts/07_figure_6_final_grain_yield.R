@@ -6,7 +6,7 @@
 # Purpose
 # -------
 # Generates the publication-ready point plot of final grain yield for
-# the five subplots distributed along the experimental N gradient.
+# the five plots distributed along the experimental N gradient.
 #
 # Input
 # -----
@@ -18,7 +18,7 @@
 #
 # Notes
 # -----
-# Each point represents one subplot associated with one N level.
+# Each point represents one plot associated with one N level.
 # N levels were not independently replicated; no fitted model,
 # interpolation, or dose-response relationship is implied.
 # ============================================================
@@ -91,7 +91,7 @@ d <- read.csv(
 # ------------------------------------------------------------
 
 required_columns <- c(
-  "subplot",
+  "plot",
   "N_rate_kg_ha",
   "grain_yield_t_ha"
 )
@@ -120,7 +120,7 @@ harvest <- unique(
   d[
     ,
     c(
-      "subplot",
+      "plot",
       "N_rate_kg_ha",
       "grain_yield_t_ha"
     )
@@ -135,7 +135,7 @@ harvest <- harvest[
 
 if (nrow(harvest) != 5) {
   stop(
-    "Expected 5 unique subplot-level yield observations; found ",
+    "Expected 5 unique plot-level yield observations; found ",
     nrow(harvest)
   )
 }
@@ -145,14 +145,14 @@ if (nrow(harvest) != 5) {
 # 6. X-AXIS LABELS
 # ------------------------------------------------------------
 
-harvest$subplot_N <- paste0(
-  harvest$subplot,
+harvest$plot_N <- paste0(
+  harvest$plot,
   " / ",
   harvest$N_rate_kg_ha
 )
 
-harvest$subplot_N <- factor(
-  harvest$subplot_N,
+harvest$plot_N <- factor(
+  harvest$plot_N,
   levels = c(
     "P1 / 0",
     "P2 / 100",
@@ -251,7 +251,7 @@ theme_journal <- theme_classic(
 fig6 <- ggplot(
   harvest,
   aes(
-    x = subplot_N,
+    x = plot_N,
     y = grain_yield_t_ha
   )
 ) +
@@ -294,7 +294,7 @@ fig6 <- ggplot(
   
   labs(
     x = expression(
-      "Subplot / N rate (kg N " * ha^-1 * ")"
+      "Plot / N rate (kg N " * ha^-1 * ")"
     ),
     y = expression(
       "Final grain yield (t " * ha^-1 * ")"
@@ -341,12 +341,13 @@ cat(
 )
 
 cat(
-  "\nEach point represents one subplot associated with one N level.\n"
+  "\nEach point represents one plot associated with one N level.\n"
 )
 
 cat(
   "No fitted model, interpolation, or dose-response relationship is shown.\n"
 )
+
 
 # ============================================================
 # END
