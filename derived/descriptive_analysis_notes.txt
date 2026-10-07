@@ -2,8 +2,8 @@ DESCRIPTIVE ANALYSIS NOTES
 ==========================
 
 Experimental structure:
-- 5 field subplots observed repeatedly across 5 UAV flights.
-- One nitrogen rate per subplot; nitrogen treatments are not independently replicated.
+- 5 field plots observed repeatedly across 5 UAV flights.
+- One nitrogen rate per plot; nitrogen treatments are not independently replicated.
 - 25 spectral/structural rows, but only 5 independent final-harvest observations.
 
 Analytical rules used in 03_descriptive_analysis.R:
