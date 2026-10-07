@@ -160,12 +160,12 @@ if (!same.crs(ndvi_r, "EPSG:32618")) {
 # 4. BASIC CLEANING
 # ------------------------------------------------------------
 
-canopy_sf$subplot <- factor(
-  canopy_sf$subplot,
+canopy_sf$plot <- factor(
+  canopy_sf$plot,
   levels = c("P1", "P2", "P3", "P4", "P5")
 )
 
-subplot_cols <- c(
+plot_cols <- c(
   "P1" = "#2C91D1",
   "P2" = "#E69F00",
   "P3" = "#00A087",
@@ -382,23 +382,23 @@ line_scalebar_layers <- function(
 # It does not call sub$geometry.
 # ------------------------------------------------------------
 
-get_subplot_center <- function(
+get_plot_center <- function(
   x_sf,
-  subplot_name
+  plot_name
 ) {
 
-  if (!("subplot" %in% names(x_sf))) {
-    stop("The canopy layer does not contain the field 'subplot'.")
+  if (!("plot" %in% names(x_sf))) {
+    stop("The canopy layer does not contain the field 'plot'.")
   }
 
   sub <- x_sf[
-    as.character(x_sf$subplot) == subplot_name,
+    as.character(x_sf$plot) == plot_name,
   ]
 
   if (nrow(sub) == 0) {
     stop(
-      "Subplot not found: ",
-      subplot_name
+      "Plot not found: ",
+      plot_name
     )
   }
 
@@ -772,13 +772,13 @@ scale_y <- ymin - 0.105 * dy
 # ------------------------------------------------------------
 # 10. PANEL (a)
 # ------------------------------------------------------------
-# Updated only to fine-tune subplot callouts and N-treatment labels.
+# Updated only to fine-tune plot callouts and N-treatment labels.
 # All cartographic settings (extent, CRS, north arrow, scale, colours)
 # remain unchanged.
 
 pa_box_df <- data.frame(
-  subplot = factor(c("P1", "P2", "P3", "P4", "P5"),
-                   levels = levels(canopy_sf$subplot)),
+  plot = factor(c("P1", "P2", "P3", "P4", "P5"),
+                   levels = levels(canopy_sf$plot)),
   x = c(412763.05, 412766.15, 412759.45, 412753.55, 412743.55),
   y = c(501787.10, 501778.72, 501775.55, 501772.62, 501778.88),
   label = c("P1", "P2", "P3", "P4", "P5")
@@ -839,13 +839,13 @@ pA <- ggplot() +
 
   geom_sf(
     data = canopy_sf,
-    aes(fill = subplot),
+    aes(fill = plot),
     color = NA,
     linewidth = 0
   ) +
 
   scale_fill_manual(
-    values = subplot_cols,
+    values = plot_cols,
     guide = "none"
   ) +
 
@@ -860,10 +860,10 @@ pA <- ggplot() +
 
   # Coloured border for each P1-P5 label box.
   # A second black text layer is drawn on top so the text itself
-  # remains black while the border preserves the subplot colour.
+  # remains black while the border preserves the plot colour.
   geom_label(
     data = pa_box_df,
-    aes(x = x, y = y, label = label, colour = subplot),
+    aes(x = x, y = y, label = label, colour = plot),
     inherit.aes = FALSE,
     fill = "grey97",
     size = PA_BOX_TEXT_SIZE,
@@ -900,7 +900,7 @@ pA <- ggplot() +
   ) +
 
   scale_colour_manual(
-    values = subplot_cols,
+    values = plot_cols,
     guide = "none"
   ) +
 
@@ -991,12 +991,12 @@ mean_breaks <- seq(
 )
 
 # zoom centers — corrected function used here
-center_p4 <- get_subplot_center(
+center_p4 <- get_plot_center(
   canopy_sf,
   "P4"
 )
 
-center_p1 <- get_subplot_center(
+center_p1 <- get_plot_center(
   canopy_sf,
   "P1"
 )
