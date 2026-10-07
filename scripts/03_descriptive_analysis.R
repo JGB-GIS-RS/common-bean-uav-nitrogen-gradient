@@ -8,10 +8,10 @@
 #
 # Design constraints
 # ------------------
-# - Five subplots were observed repeatedly across five UAV flights.
-# - Each nitrogen rate is represented by one subplot only.
+# - Five plots were observed repeatedly across five UAV flights.
+# - Each nitrogen rate is represented by one plot only.
 # - Nitrogen treatments are not independently replicated.
-# - Grain yield was measured once per subplot at final harvest.
+# - Grain yield was measured once per plot at final harvest.
 # - The 25 longitudinal rows must not be treated as 25 independent
 #   yield observations.
 # - No treatment-level hypothesis tests, ANOVA, inferential p-values,
@@ -26,7 +26,7 @@
 #   derived/descriptive_summary_by_flight.csv
 #   derived/exploratory_N_associations_by_flight.csv
 #   derived/exploratory_yield_associations_by_flight.csv
-#   derived/final_harvest_by_subplot.csv
+#   derived/final_harvest_by_plot.csv
 #   derived/exploratory_N_yield_association.csv
 #   derived/descriptive_analysis_notes.txt
 #
@@ -85,7 +85,7 @@ required_columns <- c(
   "flight",
   "date",
   "growth_stage",
-  "subplot",
+  "plot",
   "N_rate_kg_ha",
   "canopy_area_m2",
   "canopy_polygon_count",
@@ -127,36 +127,36 @@ if (length(unique(d$flight)) != 5) {
   stop("Expected 5 flights.")
 }
 
-if (length(unique(d$subplot)) != 5) {
-  stop("Expected 5 subplots.")
+if (length(unique(d$plot)) != 5) {
+  stop("Expected 5 plots.")
 }
 
 rows_per_flight <- table(d$flight)
 
 if (any(rows_per_flight != 5)) {
   stop(
-    "Each flight must contain exactly 5 subplot records."
+    "Each flight must contain exactly 5 plot records."
   )
 }
 
-rows_per_subplot <- table(d$subplot)
+rows_per_plot <- table(d$plot)
 
-if (any(rows_per_subplot != 5)) {
+if (any(rows_per_plot != 5)) {
   stop(
-    "Each subplot must contain exactly 5 repeated UAV observations."
+    "Each plot must contain exactly 5 repeated UAV observations."
   )
 }
 
-# Check that treatment assignment is constant within subplot
-for (s in unique(d$subplot)) {
+# Check that treatment assignment is constant within plot
+for (s in unique(d$plot)) {
 
   z <- d[
-    d$subplot == s,
+    d$plot == s,
   ]
 
   if (length(unique(z$N_rate_kg_ha)) != 1) {
     stop(
-      "Nitrogen rate is not constant for subplot ",
+      "Nitrogen rate is not constant for plot ",
       s
     )
   }
@@ -169,10 +169,10 @@ harvest_fields <- c(
   "grain_yield_t_ha"
 )
 
-for (s in unique(d$subplot)) {
+for (s in unique(d$plot)) {
 
   z <- d[
-    d$subplot == s,
+    d$plot == s,
   ]
 
   for (v in harvest_fields) {
@@ -181,7 +181,7 @@ for (s in unique(d$subplot)) {
       stop(
         "Harvest variable ",
         v,
-        " is not constant across flights for subplot ",
+        " is not constant across flights for plot ",
         s
       )
     }
@@ -228,7 +228,7 @@ for (f in sort(unique(d$flight))) {
       date = z$date[1],
       growth_stage = z$growth_stage[1],
       variable = v,
-      n_subplots = length(x),
+      n_plots = length(x),
       mean = mean(
         x,
         na.rm = TRUE
@@ -329,7 +329,7 @@ harvest_table <- unique(
   d[
     ,
     c(
-      "subplot",
+      "plot",
       "N_rate_kg_ha",
       "harvest_area_m2",
       "harvested_grain_kg",
@@ -369,7 +369,7 @@ N_yield_association <- data.frame(
     method = "spearman"
   ),
   interpretation =
-    "Exploratory descriptive association only; one subplot per N rate.",
+    "Exploratory descriptive association only; one plot per N rate.",
   stringsAsFactors = FALSE
 )
 
@@ -378,7 +378,7 @@ N_yield_association <- data.frame(
 # ------------------------------------------------------------
 #
 # Yield is evaluated separately within each flight.
-# Each correlation therefore uses the five independent subplot-level
+# Each correlation therefore uses the five independent plot-level
 # harvest observations once, never the pooled 25-row structure.
 # ------------------------------------------------------------
 
@@ -462,7 +462,7 @@ write.csv(
   harvest_table,
   file.path(
     derived_root,
-    "final_harvest_by_subplot.csv"
+    "final_harvest_by_plot.csv"
   ),
   row.names = FALSE
 )
@@ -485,8 +485,8 @@ notes <- c(
   "==========================",
   "",
   "Experimental structure:",
-  "- 5 field subplots observed repeatedly across 5 UAV flights.",
-  "- One nitrogen rate per subplot; nitrogen treatments are not independently replicated.",
+  "- 5 field plots observed repeatedly across 5 UAV flights.",
+  "- One nitrogen rate per plot; nitrogen treatments are not independently replicated.",
   "- 25 spectral/structural rows, but only 5 independent final-harvest observations.",
   "",
   "Analytical rules used in 03_descriptive_analysis.R:",
@@ -521,7 +521,7 @@ cat("====================================================\n\n")
 
 cat("Rows in master dataset: ", nrow(d), "\n", sep = "")
 cat("Flights: ", length(unique(d$flight)), "\n", sep = "")
-cat("Subplots: ", length(unique(d$subplot)), "\n", sep = "")
+cat("Plots: ", length(unique(d$plot)), "\n", sep = "")
 cat("Independent harvest records: ", nrow(harvest_table), "\n", sep = "")
 
 cat("\nMean UAV metrics by flight:\n")
