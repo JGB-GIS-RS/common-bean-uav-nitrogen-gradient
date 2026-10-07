@@ -30,7 +30,7 @@
 # Notes
 # -----
 # Correlations are stage-specific, descriptive, and exploratory.
-# Each coefficient is based on the five subplots (n = 5 per stage).
+# Each coefficient is based on the five plots (n = 5 per stage).
 # ============================================================
 
 
@@ -433,7 +433,7 @@ cat(
 )
 
 cat(
-  "Each stage-specific correlation is based on n = 5 subplots.\n"
+  "Each stage-specific correlation is based on n = 5 plots.\n"
 )
 
 # ============================================================
