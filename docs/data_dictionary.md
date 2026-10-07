@@ -7,28 +7,28 @@ This document describes the variables in `data/common_bean_uav_master_dataset.cs
 | `flight` | Integer | 1–5 | Sequential UAV flight number. |
 | `date` | Date | YYYY-MM-DD | UAV acquisition date. |
 | `growth_stage` | Categorical | V4, R5, R6, R7, R8 | Common-bean growth stage associated with the UAV acquisition. |
-| `subplot` | Categorical | P1–P5 | Field subplot identifier. |
-| `N_rate_kg_ha` | Numeric | kg N ha⁻¹ | Nitrogen application rate assigned to the subplot. |
-| `canopy_area_m2` | Numeric | m² | Total projected canopy area segmented within the subplot at the corresponding UAV acquisition. |
-| `canopy_polygon_count` | Integer | count | Number of segmented canopy objects within the subplot. This is not equivalent to plant count because individual canopies can merge during crop development. |
-| `NDVI_mean` | Numeric | dimensionless | Mean Normalized Difference Vegetation Index calculated over canopy pixels within the subplot. |
-| `MSAVI_mean` | Numeric | dimensionless | Mean Modified Soil-Adjusted Vegetation Index calculated over canopy pixels within the subplot. |
-| `WDRVI_mean` | Numeric | dimensionless | Mean Wide Dynamic Range Vegetation Index calculated over canopy pixels within the subplot. |
+| `plot` | Categorical | P1–P5 | Field plot identifier. |
+| `N_rate_kg_ha` | Numeric | kg N ha⁻¹ | Nitrogen application rate associated with the plot. |
+| `canopy_area_m2` | Numeric | m² | Total projected canopy area segmented within the plot at the corresponding UAV acquisition. |
+| `canopy_polygon_count` | Integer | count | Number of segmented canopy objects within the plot. This is not equivalent to plant count because individual canopies can merge during crop development. |
+| `NDVI_mean` | Numeric | dimensionless | Mean Normalized Difference Vegetation Index calculated over canopy pixels within the plot. |
+| `MSAVI_mean` | Numeric | dimensionless | Mean Modified Soil-Adjusted Vegetation Index calculated over canopy pixels within the plot. |
+| `WDRVI_mean` | Numeric | dimensionless | Mean Wide Dynamic Range Vegetation Index calculated over canopy pixels within the plot. |
 | `harvest_area_m2` | Numeric | m² | Ground area effectively harvested for grain-yield determination. |
-| `harvested_grain_kg` | Numeric | kg | Total harvested grain mass for the subplot at final harvest. |
+| `harvested_grain_kg` | Numeric | kg | Total harvested grain mass for the plot at final harvest. |
 | `grain_yield_t_ha` | Numeric | t ha⁻¹ | Grain yield standardized by harvested ground area. |
 
 ## Row structure
 
 The dataset has one row for each combination of:
 
-`subplot × flight`
+`plot × flight`
 
-Thus, 5 subplots × 5 flights = 25 rows.
+Thus, 5 plots × 5 flights = 25 rows.
 
 ## Nitrogen-rate assignment
 
-| Subplot | N rate (kg N ha⁻¹) |
+| Plot | N rate (kg N ha⁻¹) |
 |---|---:|
 | P1 | 0 |
 | P2 | 100 |
@@ -36,19 +36,19 @@ Thus, 5 subplots × 5 flights = 25 rows.
 | P4 | 300 |
 | P5 | 400 |
 
-Because there is one subplot per nitrogen rate, the nitrogen gradient has no independent treatment replication.
+Because there is one plot per nitrogen rate, the nitrogen gradient has no independent treatment replication.
 
 ## Final-harvest variables
 
-`harvest_area_m2`, `harvested_grain_kg`, and `grain_yield_t_ha` describe the final harvest of each subplot.
+`harvest_area_m2`, `harvested_grain_kg`, and `grain_yield_t_ha` describe the final harvest of each plot.
 
-These values are repeated across the five UAV-flight records for the same subplot to support longitudinal joins and analysis.
+These values are repeated across the five UAV-flight records for the same plot to support longitudinal joins and analysis.
 
-They must not be interpreted as five independent harvest measurements per subplot.
+They must not be interpreted as five independent harvest measurements per plot.
 
 The final values are:
 
-| Subplot | Harvest area (m²) | Harvested grain (kg) | Grain yield (t ha⁻¹) |
+| Plot | Harvest area (m²) | Harvested grain (kg) | Grain yield (t ha⁻¹) |
 |---|---:|---:|---:|
 | P1 | 40 | 3.722 | 0.9305 |
 | P2 | 40 | 5.077 | 1.2693 |
@@ -72,4 +72,4 @@ Accordingly, the variable should be interpreted as the number of segmented canop
 
 The 25 rows are longitudinal observations, not 25 independent experimental replicates.
 
-For analyses involving final grain yield, the experimental information remains five subplot-level harvest observations. Any model using the 25-row structure must explicitly account for repeated measurements and the non-independence of repeated final-yield values.
+For analyses involving final grain yield, the experimental information remains five plot-level harvest observations. Any model using the 25-row structure must explicitly account for repeated measurements and the non-independence of repeated final-yield values.
