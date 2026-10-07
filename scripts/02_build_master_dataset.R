@@ -4,11 +4,11 @@
 # Purpose
 # -------
 # Builds the canonical 25-row analytical dataset by integrating
-# subplot-level UAV canopy metrics with final harvest measurements.
+# plot-level UAV canopy metrics with final harvest measurements.
 #
 # Inputs
 # ------
-#   derived/canopy_summary_by_subplot.csv
+#   derived/canopy_summary_by_plot.csv
 #   data/field/harvest_data.csv
 #
 # Output
@@ -17,7 +17,7 @@
 #
 # Notes
 # -----
-# Final grain yield is measured once per subplot and repeated across
+# Final grain yield is measured once per plot and repeated across
 # flight rows only to preserve the longitudinal data structure.
 # Expected working directory: repository root.
 # ============================================================
@@ -30,7 +30,7 @@ project_root <- normalizePath(".", winslash = "/", mustWork = TRUE)
 canopy_file <- file.path(
   project_root,
   "derived",
-  "canopy_summary_by_subplot.csv"
+  "canopy_summary_by_plot.csv"
 )
 
 harvest_file <- file.path(
@@ -62,13 +62,13 @@ harvest <- read.csv(
 )
 
 required_canopy <- c(
-  "flight","date","growth_stage","subplot","N_rate_kg_ha",
+  "flight","date","growth_stage","plot","N_rate_kg_ha",
   "canopy_area_m2","canopy_polygon_count",
   "NDVI_mean","MSAVI_mean","WDRVI_mean"
 )
 
 required_harvest <- c(
-  "subplot","N_rate_kg_ha",
+  "plot","N_rate_kg_ha",
   "harvest_area_m2","harvested_grain_kg"
 )
 
@@ -85,14 +85,14 @@ if (nrow(canopy) != 25) {
 if (nrow(harvest) != 5) {
   stop("Expected 5 harvest rows; found ", nrow(harvest))
 }
-if (anyDuplicated(harvest$subplot)) {
-  stop("Duplicate subplot IDs found in harvest_data.csv")
+if (anyDuplicated(harvest$plot)) {
+  stop("Duplicate plot IDs found in harvest_data.csv")
 }
 
-m <- match(canopy$subplot, harvest$subplot)
+m <- match(canopy$plot, harvest$plot)
 
 if (anyNA(m)) {
-  stop("At least one canopy subplot is missing from harvest_data.csv")
+  stop("At least one canopy plot is missing from harvest_data.csv")
 }
 
 if (any(
@@ -114,7 +114,7 @@ master <- data.frame(
   flight = canopy$flight,
   date = canopy$date,
   growth_stage = canopy$growth_stage,
-  subplot = canopy$subplot,
+  plot = canopy$plot,
   N_rate_kg_ha = canopy$N_rate_kg_ha,
   canopy_area_m2 = canopy$canopy_area_m2,
   canopy_polygon_count = canopy$canopy_polygon_count,
@@ -147,8 +147,8 @@ cat("\n====================================================\n")
 cat("MASTER DATASET CREATED\n")
 cat("====================================================\n")
 cat("Rows: ", nrow(master), "\n", sep = "")
-cat("Subplots: ", length(unique(master$subplot)), "\n", sep = "")
+cat("Plots: ", length(unique(master$plot)), "\n", sep = "")
 cat("Flights: ", length(unique(master$flight)), "\n", sep = "")
 cat("Output: ", master_file, "\n", sep = "")
-cat("\nImportant: grain yield is measured once per subplot and is\n")
+cat("\nImportant: grain yield is measured once per plot and is\n")
 cat("repeated across flight rows only to maintain longitudinal structure.\n")
