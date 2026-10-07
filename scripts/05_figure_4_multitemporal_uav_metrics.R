@@ -25,9 +25,11 @@
 #
 # Notes
 # -----
-# Each trajectory represents one subplot associated with one N level.
-# The figure is descriptive and does not imply replicated treatment-level
-# inference.
+# Each trajectory represents one plot associated with one N level.
+# Plot identifiers P1-P5 are shown directly in panel (a).
+# The legend links each plot identifier to its associated N rate.
+# The figure is descriptive and does not imply replicated
+# treatment-level inference.
 # ============================================================
 
 
@@ -108,7 +110,7 @@ required_columns <- c(
   "flight",
   "date",
   "growth_stage",
-  "subplot",
+  "plot",
   "N_rate_kg_ha",
   "canopy_area_m2",
   "NDVI_mean",
@@ -166,18 +168,20 @@ d$growth_stage <- factor(
   levels = stage_levels
 )
 
-d$subplot_N <- factor(
+# Legend entries explicitly link P1-P5
+# with their associated N rates.
+d$plot_N <- factor(
   paste0(
-    d$subplot,
-    " / ",
+    d$plot,
+    ": ",
     d$N_rate_kg_ha
   ),
   levels = c(
-    "P1 / 0",
-    "P2 / 100",
-    "P3 / 200",
-    "P4 / 300",
-    "P5 / 400"
+    "P1: 0",
+    "P2: 100",
+    "P3: 200",
+    "P4: 300",
+    "P5: 400"
   )
 )
 
@@ -187,18 +191,18 @@ d$subplot_N <- factor(
 # ------------------------------------------------------------
 
 legend_title <- expression(
-  "Subplot / N rate (kg N " * ha^-1 * ")"
+  "N rate (kg N " * ha^-1 * ")"
 )
 
 # Second visual encoding in addition to color.
 # P5 uses an open circle instead of a cross to avoid
 # confusion with error bars or uncertainty symbols.
-subplot_shapes <- c(
-  "P1 / 0"   = 16,  # filled circle
-  "P2 / 100" = 17,  # filled triangle
-  "P3 / 200" = 15,  # filled square
-  "P4 / 300" = 18,  # filled diamond
-  "P5 / 400" = 1    # open circle
+plot_shapes <- c(
+  "P1: 0"   = 16,  # filled circle
+  "P2: 100" = 17,  # filled triangle
+  "P3: 200" = 15,  # filled square
+  "P4: 300" = 18,  # filled diamond
+  "P5: 400" = 1    # open circle
 )
 
 
@@ -291,10 +295,11 @@ theme_journal <- theme_classic(
       "cm"
     ),
     
-    # Compact margins
+    # Slightly wider right margin to accommodate
+    # direct P1-P5 labels in panel (a)
     plot.margin = margin(
       5,
-      7,
+      16,
       5,
       5
     )
@@ -309,17 +314,18 @@ make_panel <- function(
     data,
     y_variable,
     y_label,
-    panel_label
+    panel_label,
+    add_plot_labels = FALSE
 ) {
   
-  ggplot(
+  p <- ggplot(
     data,
     aes(
       x = growth_stage,
       y = .data[[y_variable]],
-      group = subplot,
-      color = subplot_N,
-      shape = subplot_N
+      group = plot,
+      color = plot_N,
+      shape = plot_N
     )
   ) +
     
@@ -340,21 +346,27 @@ make_panel <- function(
       name = legend_title
     ) +
     
-    # Different point shape for each subplot / N-rate combination
+    # Different point shape for each plot / N-rate combination
     scale_shape_manual(
-      values = subplot_shapes,
+      values = plot_shapes,
       name = legend_title
     ) +
     
     scale_x_discrete(
-      labels = stage_date_labels
+      labels = stage_date_labels,
+      expand = expansion(
+        add = c(
+          0.20,
+          0.80
+        )
+      )
     ) +
     
     scale_y_continuous(
       expand = expansion(
         mult = c(
           0.05,
-          0.08
+          0.10
         )
       )
     ) +
@@ -365,9 +377,14 @@ make_panel <- function(
       y = y_label
     ) +
     
+    coord_cartesian(
+      clip = "off"
+    ) +
+    
     theme_journal +
     
     guides(
+      
       color = guide_legend(
         title.position = "top",
         title.hjust = 0.5,
@@ -382,6 +399,81 @@ make_panel <- function(
         byrow = TRUE
       )
     )
+  
+  
+  # ----------------------------------------------------------
+  # Direct P1-P5 labels for panel (a)
+  # ----------------------------------------------------------
+  
+  if (add_plot_labels) {
+    
+    label_data <- data[
+      data$growth_stage == "R8",
+      ,
+      drop = FALSE
+    ]
+    
+    # Start from the observed R8 canopy-area value
+    label_data$label_y <- label_data[[y_variable]]
+    
+    # Manual vertical offsets to avoid label overlap.
+    #
+    # P5 is moved upward and P3 downward.
+    # P2 is moved upward and P1 downward.
+    # P4 requires only a small upward adjustment.
+    
+    label_data$label_y[
+      label_data$plot == "P1"
+    ] <- label_data$label_y[
+      label_data$plot == "P1"
+    ] - 0.45
+    
+    label_data$label_y[
+      label_data$plot == "P2"
+    ] <- label_data$label_y[
+      label_data$plot == "P2"
+    ] + 0.40
+    
+    label_data$label_y[
+      label_data$plot == "P3"
+    ] <- label_data$label_y[
+      label_data$plot == "P3"
+    ] - 0.35
+    
+    label_data$label_y[
+      label_data$plot == "P4"
+    ] <- label_data$label_y[
+      label_data$plot == "P4"
+    ] + 0.10
+    
+    label_data$label_y[
+      label_data$plot == "P5"
+    ] <- label_data$label_y[
+      label_data$plot == "P5"
+    ] + 0.45
+    
+    
+    p <- p +
+      
+      geom_text(
+        data = label_data,
+        aes(
+          x = growth_stage,
+          y = label_y,
+          label = plot,
+          color = plot_N
+        ),
+        inherit.aes = FALSE,
+        nudge_x = 0.18,
+        hjust = 0,
+        size = 3.4,
+        fontface = "bold",
+        show.legend = FALSE
+      )
+  }
+  
+  
+  p
 }
 
 
@@ -395,7 +487,8 @@ p_a <- make_panel(
   y_label = expression(
     "Projected canopy area (" * m^2 * ")"
   ),
-  panel_label = "(a)"
+  panel_label = "(a)",
+  add_plot_labels = TRUE
 )
 
 
@@ -481,16 +574,25 @@ cat(
 )
 
 cat(
-  "\nEach line represents one subplot / N-rate combination.\n"
+  "\nEach line represents one plot / N-rate combination.\n"
 )
 
 cat(
-  "Color and point shape identify the same subplot / N-rate combination.\n"
+  "P1-P5 are labeled directly in panel (a).\n"
+)
+
+cat(
+  "The legend identifies the N rate associated with each plot.\n"
+)
+
+cat(
+  "Color and point shape identify the same plot / N-rate combination across panels.\n"
 )
 
 cat(
   "No treatment-level inference is implied by the figure.\n"
 )
+
 
 # ============================================================
 # END
