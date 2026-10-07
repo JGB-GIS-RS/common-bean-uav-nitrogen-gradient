@@ -157,12 +157,12 @@ for (i in seq_len(nrow(flights))) {
   # 4.1 READ P1-P5
   # ----------------------------------------------------------
 
-  subplot_vectors <- list()
+  plot_vectors <- list()
   reference_crs <- NULL
 
   for (p in 1:5) {
 
-    subplot <- paste0("P", p)
+    plot <- paste0("P", p)
 
     shp <- file.path(
       flight_dir,
@@ -191,7 +191,7 @@ for (i in seq_len(nrow(flights))) {
       )
     }
 
-    # Use the CRS of the first subplot as the reference CRS.
+    # Use the CRS of the first plot as the reference CRS.
     if (is.null(reference_crs)) {
       reference_crs <- crs(v)
     } else if (!same.crs(v, reference_crs)) {
@@ -217,13 +217,13 @@ for (i in seq_len(nrow(flights))) {
         growth_stage,
         n_objects
       ),
-      subplot = rep(
-        subplot,
+      plot = rep(
+        plot,
         n_objects
       ),
       N_rate_kg_ha = rep(
         as.numeric(
-          N_rate[subplot]
+          N_rate[plot]
         ),
         n_objects
       ),
@@ -233,10 +233,10 @@ for (i in seq_len(nrow(flights))) {
       stringsAsFactors = FALSE
     )
 
-    subplot_vectors[[subplot]] <- v
+    plot_vectors[[plot]] <- v
 
     cat(
-      subplot,
+      plot,
       ": ",
       n_objects,
       " canopy object(s)\n",
@@ -257,7 +257,7 @@ for (i in seq_len(nrow(flights))) {
     function(x, y) {
       rbind(x, y)
     },
-    subplot_vectors
+    plot_vectors
   )
 
   # ----------------------------------------------------------
@@ -307,15 +307,15 @@ for (i in seq_len(nrow(flights))) {
   }
 
   # ----------------------------------------------------------
-  # 4.5 VALIDATE EACH SUBPLOT
+  # 4.5 VALIDATE EACH PLOT
   # ----------------------------------------------------------
 
-  for (subplot in names(subplot_vectors)) {
+  for (plot in names(plot_vectors)) {
 
-    original <- subplot_vectors[[subplot]]
+    original <- plot_vectors[[plot]]
 
     exported <- canopy_check[
-      canopy_check$subplot == subplot,
+      canopy_check$plot == plot,
     ]
 
     original_area <- sum(
@@ -342,9 +342,9 @@ for (i in seq_len(nrow(flights))) {
       flight = flight_id,
       date = date_txt,
       growth_stage = growth_stage,
-      subplot = subplot,
+      plot = plot,
       N_rate_kg_ha = as.numeric(
-        N_rate[subplot]
+        N_rate[plot]
       ),
       source_polygon_count = nrow(
         original
