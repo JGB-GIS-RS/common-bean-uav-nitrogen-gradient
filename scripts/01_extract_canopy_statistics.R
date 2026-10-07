@@ -15,8 +15,8 @@
 #
 # Outputs
 # -------
-#   derived/canopy_statistics_by_subplot_index.csv
-#   derived/canopy_summary_by_subplot.csv
+#   derived/canopy_statistics_by_plot_index.csv
+#   derived/canopy_summary_by_plot.csv
 #   derived/qa_spatial_extraction.csv
 #
 # Notes
@@ -368,7 +368,7 @@ for (i in seq_len(nrow(flights))) {
     "flight",
     "date",
     "growth_stage",
-    "subplot",
+    "plot",
     "N_rate_kg_ha",
     "canopy_object_id"
   )
@@ -383,7 +383,7 @@ for (i in seq_len(nrow(flights))) {
     )
   }
 
-  subplots <- c(
+  plots <- c(
     "P1",
     "P2",
     "P3",
@@ -391,16 +391,16 @@ for (i in seq_len(nrow(flights))) {
     "P5"
   )
 
-  for (subplot in subplots) {
+  for (plot in plots) {
 
     canopy <- canopy_all[
-      canopy_all$subplot == subplot,
+      canopy_all$plot == plot,
     ]
 
     if (nrow(canopy) == 0) {
       stop(
         "No canopy polygons found for ",
-        subplot,
+        plot,
         " in ",
         basename(
           gpkg_file
@@ -415,7 +415,7 @@ for (i in seq_len(nrow(flights))) {
     if (length(N_rate_value) != 1) {
       stop(
         "Multiple N rates detected for ",
-        subplot,
+        plot,
         " in ",
         basename(
           gpkg_file
@@ -427,7 +427,7 @@ for (i in seq_len(nrow(flights))) {
       canopy
     )
 
-    subplot_results <- list()
+    plot_results <- list()
 
     for (idx in names(rasters)) {
 
@@ -441,7 +441,7 @@ for (i in seq_len(nrow(flights))) {
           flight = flight_id,
           date = date_txt,
           growth_stage = growth_stage,
-          subplot = subplot,
+          plot = plot,
           N_rate_kg_ha = as.numeric(
             N_rate_value
           ),
@@ -454,26 +454,26 @@ for (i in seq_len(nrow(flights))) {
       )
 
       results[[k]] <- row
-      subplot_results[[idx]] <- row
+      plot_results[[idx]] <- row
       k <- k + 1
     }
 
     area_values <- sapply(
-      subplot_results,
+      plot_results,
       function(z) {
         z$canopy_area_m2
       }
     )
 
     coverage_values <- sapply(
-      subplot_results,
+      plot_results,
       function(z) {
         z$coverage_pct
       }
     )
 
     outside_values <- sapply(
-      subplot_results,
+      plot_results,
       function(z) {
         z$pct_outside_minus1_1
       }
@@ -483,7 +483,7 @@ for (i in seq_len(nrow(flights))) {
       flight = flight_id,
       date = date_txt,
       growth_stage = growth_stage,
-      subplot = subplot,
+      plot = plot,
       N_rate_kg_ha = as.numeric(
         N_rate_value
       ),
@@ -559,7 +559,7 @@ summary_25 <- data.frame(
   flight = ndvi$flight,
   date = ndvi$date,
   growth_stage = ndvi$growth_stage,
-  subplot = ndvi$subplot,
+  plot = ndvi$plot,
   N_rate_kg_ha = ndvi$N_rate_kg_ha,
   canopy_area_m2 = ndvi$canopy_area_m2,
   canopy_polygon_count =
@@ -629,7 +629,7 @@ write.csv(
   long_table,
   file.path(
     derived_root,
-    "canopy_statistics_by_subplot_index.csv"
+    "canopy_statistics_by_plot_index.csv"
   ),
   row.names = FALSE
 )
@@ -638,7 +638,7 @@ write.csv(
   summary_25,
   file.path(
     derived_root,
-    "canopy_summary_by_subplot.csv"
+    "canopy_summary_by_plot.csv"
   ),
   row.names = FALSE
 )
