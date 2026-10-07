@@ -1,4 +1,4 @@
-flight,date,growth_stage,subplot,N_rate_kg_ha,canopy_area_m2,canopy_polygon_count,NDVI_mean,MSAVI_mean,WDRVI_mean,harvest_area_m2,harvested_grain_kg,grain_yield_t_ha
+flight,date,growth_stage,plot,N_rate_kg_ha,canopy_area_m2,canopy_polygon_count,NDVI_mean,MSAVI_mean,WDRVI_mean,harvest_area_m2,harvested_grain_kg,grain_yield_t_ha
 1,2024-09-07,V4,P1,0,1.24602086041099,39,0.830907704076576,0.635044297317243,0.269568975490437,40.0,3.722,0.9305
 1,2024-09-07,V4,P2,100,0.956102668503795,36,0.814956076300278,0.625706638626854,0.26432941089838,40.0,5.077,1.26925
 1,2024-09-07,V4,P3,200,0.732697469706883,34,0.791433231876325,0.607601166765681,0.256798643838881,40.0,4.696,1.174
